@@ -15,6 +15,7 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from transformers import BitsAndBytesConfig
 
 
 class DatabaseKnowledgeExtractor:
@@ -222,7 +223,7 @@ class AdvancedRAGSystem:
         self.qa_chain = None
         
     def _init_embeddings(self):
-        print("加载BGE-M3嵌入模型...")
+        print("加载bge-small-zh-v1.5嵌入模型...")
         return HuggingFaceBgeEmbeddings(
             model_name=self.config.EMBEDDING_MODEL_NAME,
             model_kwargs={'device': 'cuda' if torch.cuda.is_available() else 'cpu'},
@@ -234,10 +235,19 @@ class AdvancedRAGSystem:
         print(f"加载Qwen3模型: {self.config.LLM_MODEL_NAME}")
 
         tokenizer = AutoTokenizer.from_pretrained(self.config.LLM_MODEL_NAME)
+
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
+
         model = AutoModelForCausalLM.from_pretrained(
             self.config.LLM_MODEL_NAME,
+            quantization_config=quantization_config,  # 使用新的参数
             device_map="cuda",
-            dtype=torch.bfloat16,
+            dtype=torch.float16,
             trust_remote_code=True
         )
 
@@ -245,7 +255,7 @@ class AdvancedRAGSystem:
             "text-generation",
             model=model,
             tokenizer=tokenizer,
-            max_new_tokens=800,  # 增加token数量处理复杂SQL
+            max_new_tokens=1000,  # 增加token数量处理复杂SQL
             temperature=0.1,     # 降低随机性
             repetition_penalty=1.1,
             pad_token_id=tokenizer.pad_token_id,
@@ -529,12 +539,12 @@ def create_enhanced_database_docs(db_config, output_dir):
 
 class Config:
     DOCUMENTS_DIR = "D:/Qwen/Qwen3/enhanced_database_docs"
-    CHUNK_SIZE = 600
+    CHUNK_SIZE = 400
     CHUNK_OVERLAP = 80
-    EMBEDDING_MODEL_NAME = "BAAI/bge-m3"  
+    EMBEDDING_MODEL_NAME = "BAAI/bge-small-zh-v1.5"  
     LLM_MODEL_NAME = "D:/Qwen/Qwen/Qwen3-8B"  
     VECTOR_DB_DIR = "vector_db_enhanced"
-    TOP_K = 4
+    TOP_K = 3
 
 
 def main():
