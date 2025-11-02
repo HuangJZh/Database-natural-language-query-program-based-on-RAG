@@ -197,4 +197,5 @@ cd ..
 
 cd rag_system
 
+
 python database_rag_system.py
