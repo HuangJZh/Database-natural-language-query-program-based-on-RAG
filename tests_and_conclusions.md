@@ -7,6 +7,114 @@ mysql搭建数据库
 
 当前主流大模型（如GPT-4、Codex、PanGu-Coder2、Qwen3等）在通用代码生成任务中已展现较强能力。然而，这些模型主要面向通用编程语言（如Python、Java），针对仿真脚本这类领域特定语言（DSL）的研究仍较少。在自动化测试领域，已有类似技术应用。例如，邮储银行通过大模型结合知识库和提示工程，实现了接口测试脚本的智能生成，支持从自然语言需求到脚本的转换，并利用外挂知识库提升生成准确性。这表明领域适配的大模型在脚本生成中具有可行性。
 
+## 系统架构
+
+### 1. **核心组件**
+
+#### **DatabaseKnowledgeExtractor类**
+
+- **功能**：从MySQL数据库提取元数据和样本数据
+- **主要方法**：
+  - `extract_schema_info()`：提取表结构、索引、统计信息
+  - `extract_sample_data()`：获取各表的样本数据
+  - `_extract_relationships()`：推断表间关系（基于预定义规则）
+
+#### **EnhancedRAGComparison类**
+
+- **功能**：测试和对比RAG系统的性能
+- **主要方法**：
+  - `get_challenging_test_scenarios()`：创建10个难度递增的测试场景
+  - `execute_and_compare()`：执行SQL并对比结果
+
+#### **AdvancedRAGSystem类**（核心）
+
+- **功能**：完整的RAG系统实现
+- **主要方法**：
+  - `_init_embeddings()`：初始化BGE-M3嵌入模型
+  - `_init_llm()`：加载Qwen3-8B语言模型
+  - `load_rag_system()`：构建RAG检索链
+  - `generate_sql_with_rag()`：使用RAG生成SQL
+  - `generate_sql_without_rag()`：不使用RAG生成SQL（基准对比）
+
+## 工作流程
+
+### **第一步：知识文档生成**
+
+python
+
+```
+create_enhanced_database_docs(db_config, output_dir)
+```
+
+生成4类文档：
+
+1. **数据库概览** - 表统计、关系、数据特征
+2. **详细表文档** - 列信息、索引、样本数据
+3. **查询模式** - 10种常用SQL模式示例
+4. **业务逻辑** - 业务规则和状态流转
+
+### **第二步：RAG系统构建**
+
+1. **文档加载与分割**
+   - 使用`DirectoryLoader`加载所有文档
+   - `RecursiveCharacterTextSplitter`进行文本分块
+2. **向量化存储**
+   - 使用`Chroma`向量数据库
+   - BGE-M3模型生成嵌入向量
+3. **检索链配置**
+   - 自定义SQL生成提示模板
+   - 配置`RetrievalQA`链
+
+### **第三步：测试评估**
+
+运行10个测试场景，对比：
+
+- **无RAG**：仅靠LLM的通用知识
+- **有RAG**：结合数据库文档的上下文
+
+## 测试场景设计
+
+从简单到复杂的10个场景：
+
+1. **简单查询** → 基础SELECT
+2. **条件查询** → WHERE子句
+3. **两表连接** → JOIN操作
+4. **聚合查询** → GROUP BY
+5. **多表连接** → 复杂JOIN
+6. **复杂列名** → 需要具体列知识
+7. **四表连接** → 多表关联
+8. **聚合分组** → 复杂统计
+9. **多条件查询** → 日期函数+多个条件
+10. **子查询分析** → HAVING+子查询
+
+## 技术特点
+
+### **嵌入模型**
+
+- 使用`BAAI/bge-m3`中文嵌入模型
+- GPU加速，支持归一化
+
+### **语言模型**
+
+- 使用`Qwen3-8B`本地模型
+- 配置：BF16精度、800 tokens、低温度值
+
+### **提示工程**
+
+python
+
+```
+SQL生成提示模板包含：
+- 数据库结构上下文
+- 明确的生成规则
+- 语法要求
+- 输出格式约束
+```
+
+### **SQL提取**
+
+使用正则表达式从LLM响应中清理和提取纯SQL语句
+
 ## 数据库结构
 
 一个中等规模的电商业务数据库，包含7个主要表
@@ -630,9 +738,16 @@ LIMIT 10
 
 ## 结果验证
 
-### 场景1
+### 场景1：简单单表查询
 
 无rag
+
+```
+SELECT user_id, username, email
+FROM users
+ORDER BY user_id
+LIMIT 10
+```
 
 ```
 📊 结果:
@@ -652,6 +767,13 @@ LIMIT 10
 rag
 
 ```
+SELECT username, email, registration_date
+FROM users
+ORDER BY user_id ASC
+LIMIT 10
+```
+
+```
 📊 结果:
 username              email registration_date
    user1  user1@example.com        2023-03-22
@@ -666,15 +788,25 @@ username              email registration_date
   user10 user10@example.com        2024-06-14
 ```
 
-### 场景2
+
+
+### 场景2：带条件的单表查询
 
 无rag
+
+```
+ SELECT * FROM users WHERE address LIKE '%纽约%' LIMIT 10
+```
 
 ```
 ❌ 查询失败: 1054 (42S22): Unknown column 'address' in 'where clause'
 ```
 
 rag
+
+```
+ SELECT * FROM users WHERE city = 'New York' LIMIT 10
+```
 
 ```
 📊 结果:
@@ -691,15 +823,31 @@ rag
      236  user236 user236@example.com +1-555-707-2542       Jane     Brown   19      M New York  Canada        2024-06-22 2025-03-08 08:30:50        Bronze           127     3983.92 2025-10-29 08:30:49
 ```
 
-### 场景3
+
+
+### 场景3：两表连接查询
 
 无rag
+
+```
+SELECT p.*, c.*
+FROM products p
+JOIN categories c ON p.category_id = c.id
+LIMIT 10
+```
 
 ```
 ❌ 查询失败: 1054 (42S22): Unknown column 'c.id' in 'on clause'
 ```
 
 rag
+
+```
+SELECT p.*, c.category_name, c.parent_category_id, c.level
+FROM products p
+JOIN categories c ON p.category_id = c.category_id
+LIMIT 10
+```
 
 ```
 📊 结果:
@@ -717,9 +865,19 @@ rag
 
 ```
 
-### 场景4
+
+
+### 场景4： 聚合查询
 
 无rag
+
+```
+ SELECT city, COUNT(*) AS user_count
+FROM users
+GROUP BY city
+ORDER BY user_count DESC
+LIMIT 10
+```
 
 ```
 📊 结果:
@@ -739,6 +897,14 @@ Philadelphia         272
 rag
 
 ```
+SELECT city, COUNT(*) AS user_count
+FROM users
+GROUP BY city
+ORDER BY user_count DESC
+LIMIT 10
+```
+
+```
 📊 结果:
         city  user_count
       London         288
@@ -755,15 +921,41 @@ Philadelphia         272
 
 
 
-### 场景5
+### 场景5：复杂多表连接
 
 无rag
+
+```
+SELECT
+    o.user_id,
+    SUM(oi.price) AS total_amount
+FROM
+    orders o
+JOIN
+    order_items oi ON o.order_id = oi.order_id
+WHERE
+    o.status = 'completed'
+GROUP BY
+    o.user_id
+ORDER BY
+    total_amount DESC
+LIMIT 10
+```
 
 ```
 ❌ 查询失败: 1054 (42S22): Unknown column 'oi.price' in 'field list'
 ```
 
 rag
+
+```
+SELECT u.username, SUM(o.total_amount) AS total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+ORDER BY total_spent DESC
+LIMIT 10
+```
 
 ```
 📊 结果:
@@ -782,9 +974,13 @@ user3589    14492.77
 
 
 
-### 场景6
+### 场景6: 复杂列名查询
 
 无rag
+
+```
+SELECT user_id, username, registration_date, last_login, city FROM users LIMIT 10
+```
 
 ```
 📊 结果:
@@ -804,14 +1000,38 @@ user3589    14492.77
 rag
 
 ```
+SELECT user_id, username, city, registration_date, last_login_time
+FROM users
+LIMIT 10
+```
+
+```
 ❌ 查询失败: 1054 (42S22): Unknown column 'last_login_time' in 'field list'
 ```
 
 
 
-### 场景7
+### 场景7: 多表连接与特定列
 
 无rag
+
+```
+SELECT
+    o.order_id,
+    u.username,
+    p.product_name,
+    oi.quantity,
+    oi.unit_price
+FROM
+    orders o
+JOIN
+    users u ON o.user_id = u.user_id
+JOIN
+    order_items oi ON o.order_id = oi.order_id
+JOIN
+    products p ON oi.product_id = p.product_id
+LIMIT 10
+```
 
 ```
 📊 结果:
@@ -831,6 +1051,15 @@ rag
 rag
 
 ```
+SELECT o.order_id, u.username, p.product_name, oi.quantity, oi.unit_price
+FROM orders o
+JOIN users u ON o.user_id = u.user_id
+JOIN order_items oi ON o.order_id = oi.order_id
+JOIN products p ON oi.product_id = p.product_id
+LIMIT 10
+```
+
+```
 📊 结果:
  order_id username        product_name  quantity unit_price
      1142    user1 Uniqlo T-Shirt 2005         2     497.69
@@ -847,9 +1076,25 @@ rag
 
 
 
-### 场景8
+### 场景8: 聚合函数与分组
 
 无rag
+
+```
+SELECT
+    c.name AS category_name,
+    AVG(p.price) AS average_price,
+    COUNT(*) AS product_count
+FROM
+    products p
+JOIN
+    categories c ON p.category_id = c.id
+GROUP BY
+    c.name
+ORDER BY
+    average_price DESC
+LIMIT 10
+```
 
 ```
 ❌ 查询失败: 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'c.name AS category_name,
@@ -858,6 +1103,17 @@ rag
 ```
 
 rag
+
+```
+SELECT c.category_name,
+AVG(p.price) as avg_price,
+COUNT(p.product_id) as product_count
+FROM products p
+JOIN categories c ON p.category_id = c.category_id
+GROUP BY c.category_id, c.category_name
+ORDER BY avg_price DESC
+LIMIT 10
+```
 
 ```
 📊 结果:
@@ -876,9 +1132,18 @@ Women Clothing  256.068304            171
 
 
 
-### 场景9
+### 场景9: 复杂条件查询
 
 无rag
+
+```
+SELECT *
+FROM users
+WHERE registration_date >= CURRENT_DATE - INTERVAL '30 days'
+AND address = 'USA, New York'
+AND user_level = 'Gold'
+LIMIT 10
+```
 
 ```
 ❌ 查询失败: 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LIMIT 10' at line 6
@@ -887,20 +1152,76 @@ Women Clothing  256.068304            171
 rag
 
 ```
+SELECT user_id, username, email, city, loyalty_level, registration_date 
+FROM users
+WHERE city = 'New York'
+AND country = 'USA'
+AND loyalty_level = 'Gold'
+AND registration_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+LIMIT 10
+```
+
+```
 ℹ️  查询成功，但未返回数据
 ```
 
 
 
-### 场景10
+### 场景10: 子查询与高级分析
 
 无rag
+
+```
+WITH user_spending AS (
+    SELECT
+        o.user_id,
+        SUM(oi.price * oi.quantity) AS total_spent
+    FROM
+        orders o
+    JOIN
+        order_items oi ON o.order_id = oi.order_id
+    GROUP BY
+        o.user_id
+),
+average_spending AS (
+    SELECT
+        AVG(total_spent) AS avg_total
+    FROM
+        user_spending
+)
+SELECT
+    us.user_id,
+    COUNT(o.order_id) AS order_count
+FROM
+    user_spending us
+JOIN
+    orders o ON us.user_id = o.user_id
+CROSS JOIN
+    average_spending a
+WHERE
+    us.total_spent > a.avg_total
+GROUP BY
+    us.user_id
+ORDER BY
+    us.total_spent DESC
+LIMIT 10
+```
 
 ```
 ❌ 查询失败: 1054 (42S22): Unknown column 'oi.price' in 'field list'
 ```
 
 rag
+
+```
+SELECT u.username, COUNT(o.order_id) AS order_count, SUM(o.total_amount) AS total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+```
 
 ```
 📊 结果:
@@ -919,6 +1240,8 @@ user3589           13    14492.77
 
 ## 准确率分析
 
+第一次测试，准确率如下：
+
 无rag
 
 准确率=4/10=40%
@@ -927,7 +1250,876 @@ rag
 
 准确率=9/10 =90%
 
+因为AI无法保证每次输出都同样准确，我们这里重复三次实验，对准确率取平均值，得到更有说服力的结果
+
+对于第二次测试，重复上述流程，准确率如下：
+
+无rag
+
+准确率=7/10=70%
+
+rag
+
+准确率=9/10 =90%
+
+对于第三次测试，重复上述流程，准确率如下：
+
+无rag
+
+准确率=5/10=50%
+
+rag
+
+准确率=10/10 =100%
+
+综上
+
+无RAG系统的准确率为53.33%
+
+有RAG系统的准确率为93.33%
+
 # 附录
+
+## 多次测试结果
+
+### 第二次测试
+
+````
+🚀 开始RAG对比测试
+============================================================
+📝 第一步：创建数据库文档...
+✅ 数据库连接成功
+✅ 数据库文档已生成到 D:/HuangJZh/Qwen3/enhanced_database_docs
+
+🔧 第二步：构建RAG系统...
+加载BGE-M3嵌入模型...
+加载Qwen3模型: D:/HuangJZh/Qwen/Qwen3-8B
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████| 5/5 [00:12<00:00,  2.59s/it]
+Device set to use cuda
+加载已有向量库...
+
+🎯 第三步：运行挑战性测试场景...
+✅ 数据库连接成功
+
+================================================================================
+测试: 场景1: 简单单表查询
+问题: 查询前10个用户的基本信息，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT * FROM users LIMIT 10   
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT user_id, username, email, created_at
+FROM users
+ORDER BY user_id ASC
+LIMIT 10
+
+================================================================================
+测试: 场景2: 带条件的单表查询
+问题: 查询来自纽约的用户，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT * FROM users WHERE city = 'New York' LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT * FROM users WHERE city = 'New York' LIMIT 10
+
+================================================================================
+测试: 场景3: 两表连接查询
+问题: 查询产品及其分类信息，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT p.*, c.*
+FROM products p
+JOIN categories c ON p.category_id = c.id
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT p.*, c.category_name, c.parent_category_id, c.level
+FROM products p
+JOIN categories c ON p.category_id = c.category_id
+LIMIT 10
+
+================================================================================
+测试: 场景4: 聚合查询
+问题: 统计每个城市的用户数量，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT city, COUNT(*) AS user_count
+FROM users
+GROUP BY city
+ORDER BY user_count DESC
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT city, COUNT(*) AS user_count
+FROM users
+GROUP BY city
+ORDER BY user_count DESC
+LIMIT 10
+
+================================================================================
+测试: 场景5: 复杂多表连接
+问题: 查询每个用户的订单总金额，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ 要求使用JOIN操作，并且不能使用子查询。
+好的，我现在需要解决的问题是：查询每个用户的订单总金额，并且限制输出为10个结果。数据库中有几个相关的表，包括users、products、orders、order_items和categories。题目要求必须使用
+JOIN操作，并且不能使用子查询。那我得仔细想想怎么把这些表连接起来，然后计算每个用户的总金额。
+
+首先，用户的信息在users表里，而订单信息应该是在orders表中。每个订单可能有多个商品项，所以需要通过order_items来关联订单和产品。这样，每个订单的总金额应该是该订单对应的所有order_items的单价乘以数量之和。不过这里可能需要先计算每个订单的总金额，然后再汇总到用户层面？
+
+或者，是否可以直接将每个订单项的金额累加，然后按用户分组？比如，把order_items中的数量乘以产品的价格，得到每件商品的总价，再对同一订单进行sum，得到每个订单的总金额，之后再按用
+户分组，sum所有订单的总金额？
+
+不过这样的话，可能需要先连接orders和order_items，然后计算每个订单的总金额，再连接users表，最后按用户分组求和。但如何确保这些步骤呢？
+
+让我一步步分析：
+
+1. 首先，要找到每个订单的总金额。这需要将orders表与order_items表连接，因为每个订单项属于一个订单。然后，每个订单项的价格应该是product_price（假设products表中有price字段），乘
+以quantity，得到该订单项的总金额。然后对同一个订单的所有订单项进行sum，得到该订单的总金额。
+
+2. 然后，将这个订单总金额与users表连接，因为每个订单属于一个用户。这时候可能需要通过orders表中的user_id来连接users表。
+
+3. 最后，按用户ID分组，对每个用户的订单总金额进行sum，得到每个用户的总消费额。
+
+但是，如果直接这样做的话，可能需要先计算每个订单的总金额，然后将这些订单总金额汇总到用户层面上。这个时候，可能需要用到GROUP BY和SUM函数。
+
+不过，题目要求的是“每个用户的订单总金额”，也就是每个用户的所有订单的总金额之和。因此，正确的做法可能是：
+
+- 连接orders和order_items，计算每个订单的总金额（即每个订单项的amount = product.price * quantity）的总和，作为订单总金额。
+- 然后将这个结果与users表连接，根据orders.user_id来关联用户。
+- 最后按用户分组，sum他们的订单总金额。
+
+不过，这样的结构可能需要多层的JOIN和聚合。例如：
+
+首先，将orders和order_items连接，计算每个订单的总金额。这一步可以通过JOIN orders和order_items，然后用SUM(product.price * order_items.quantity) OVER (PARTITION BY order_id) 来
+计算每个订单的总金额？或者是不是应该先计算每个订单的总金额，然后将其作为子查询？但题目不允许子查询，只能用JOIN。
+
+或者，是否可以将orders和order_items连接，然后计算每个订单项的金额，然后按订单分组，得到每个订单的总金额，再与users连接，然后按用户分组？
+
+但如果没有子查询的话，如何处理？比如，在JOIN的时候，可能无法直接进行这种分组后的计算？
+
+这时候可能需要用多个JOIN操作，或者利用窗口函数？
+
+不过，可能更简单的方法是，将orders和order_items连接，然后计算每个订单项的金额，然后按订单分组，得到每个订单的总金额，然后再次与users连接，再按用户分组求和。但如何在一个查询中
+完成这些步骤而不使用子查询？
+
+或许可以使用多个JOIN
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT u.username, SUM(o.total_amount) AS total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+ORDER BY total_spent DESC
+LIMIT 10
+
+================================================================================
+测试: 场景6: 复杂列名查询
+问题: 查询用户的注册日期和最后登录时间，显示用户ID、用户名和城市，限制10个输出
+
+1. 无RAG生成SQL...
+You seem to be using the pipelines sequentially on GPU. In order to maximize efficiency please use a dataset
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT user_id, username, registration_date, last_login, city FROM users LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT user_id, username, city, registration_date, last_login_time
+FROM users
+ORDER BY registration_date DESC
+LIMIT 10
+
+================================================================================
+测试: 场景7: 多表连接与特定列
+问题: 查询订单详情，包括订单ID、用户名、产品名称、数量和单价，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT
+    o.order_id,
+    u.username,
+    p.product_name,
+    oi.quantity,
+    oi.unit_price
+FROM
+    orders o
+JOIN
+    users u ON o.user_id = u.user_id
+JOIN
+    order_items oi ON o.order_id = oi.order_id
+JOIN
+    products p ON oi.product_id = p.product_id
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT o.order_id, u.username, p.product_name, oi.quantity, oi.unit_price
+FROM orders o
+JOIN users u ON o.user_id = u.user_id
+JOIN order_items oi ON o.order_id = oi.order_id
+JOIN products p ON oi.product_id = p.product_id
+LIMIT 10
+```
+
+该查询：
+1. 使用了正确的表名：orders, users, order_items, products
+2. 包含了必要的JOIN条件来连接相关表
+3. 选择了所需的列：order_id, username, product_name, quantity, unit_price
+4. 添加了LIMIT 10来限制输出结果为10条记录
+5. 符合提供的多表连接与特定列的查询模式
+6. 保持了清晰的表别名和字段映射关系
+7. 没有不必要的WHERE条件，因为用户没有指定过滤条件
+8. 使用标准的ANSI SQL语法，适用于大多数关系型数据库系统
+
+这个查询将返回前10个订单的详细信息，包括每个订单涉及的用户信息、产品信息以及订购的数量和单价。注意，由于没有指定排序方式，结果的顺序可能不是固定的，如果需要按特定顺序排列，可
+以添加ORDER BY子句。根据提供的模式，这个查询已经符合所有要求。现在我将按照规则只返回SQL查询语句：
+
+```sql
+SELECT o.order_id, u.username, p.product_name, oi.quantity, oi.unit_price
+FROM orders o
+JOIN users u ON o.user_id = u.user_id
+JOIN order_items oi ON o.order_id = oi.order_id
+JOIN products p ON oi.product_id = p.product_id
+LIMIT 10
+``` 这是最终的SQL查询语句，完全符合用户的要求和给定的数据库结构信息。它直接对应到提供的"多表连接与特定列"查询模式，并添加了LIMIT 10来满足输出限制的要求。查询语句中包含了所有 
+必要的JOIN操作以获取完整的订单详情信息。 这个查询语句是经过验证的，能够正确执行并返回所需的数据。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 
+这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这 
+就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就 
+是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是 
+最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最 
+终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终的答案。 这就是最终 
+的答案。 这就是
+
+================================================================================
+测试: 场景8: 聚合函数与分组
+问题: 统计每个产品类别的平均价格和产品数量，按平均价格降序排列，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT
+    c.category_name,
+    AVG(p.price) AS average_price,
+    COUNT(*) AS product_count
+FROM
+    products p
+JOIN
+    categories c ON p.category_id = c.category_id
+GROUP BY
+    c.category_id, c.category_name
+ORDER BY
+    average_price DESC
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT c.category_name,
+AVG(p.price) as avg_price,
+COUNT(p.product_id) as product_count
+FROM products p
+JOIN categories c ON p.category_id = c.category_id
+GROUP BY c.category_id, c.category_name
+ORDER BY avg_price DESC
+LIMIT 10
+```
+
+这个查询：
+1. 从products表和categories表进行JOIN操作，通过category_id关联
+2. 使用AVG()计算每个类别的平均价格，用COUNT()统计产品数量
+3. 按照category_id和category_name进行分组
+4. 按avg_price降序排序
+5. 最后使用LIMIT 10限制输出为前10条记录
+
+注意：虽然在GROUP BY子句中同时包含了category_id和category_name，但实际应用中如果category_name是category_id的唯一标识（即每个category_id对应唯一的category_name），则只需要GROUP BY category_id即可。不过为了保险起见，这里保留了两个字段的分组。如果数据库系统要求必须将所有非聚合列都包含在GROUP BY子句中，则需要保留这两个字段。不同数据库系统对此有不同的
+要求，例如MySQL允许仅使用category_id分组，而PostgreSQL则要求包含category_name。因此，该查询在大多数情况下都是兼容的。根据您具体的数据库环境，可能需要调整GROUP BY子句。但是根 
+据您提供的SQL模式，我们按照给出的格式进行了实现。
+
+由于您特别强调要返回纯SQL查询，所以这里只提供查询语句部分，没有额外说明。如果您有特定的数据库系统要求或需要进一步优化，请告知我。对于此查询，还可以考虑添加索引以提高性能，比 
+如在category_id和price列上创建索引。此外，如果数据量非常大，可以考虑使用窗口函数进行更复杂的分析。但根据当前需求，基础版本已经满足要求。
+
+最后再次确认，这个查询完全符合您提供的SQL模式，并且遵循了所有指定的规则，包括正确的表名、列名、JOIN条件、GROUP BY子句以及LIMIT限制。它应该能够正确地统计数据并返回所需的结果。
+
+
+考虑到您特别指出要只返回SQL查询语句，现在我将只提供最终的查询语句，不包含任何额外的解释或说明：
+
+```sql
+SELECT c.category_name,
+AVG(p.price) as avg_price,
+COUNT(p.product_id) as product_count
+FROM products p
+JOIN categories c ON p.category_id = c.category_id
+GROUP BY c.category_id, c.category_name
+ORDER BY avg_price DESC
+LIMIT 10
+```
+
+这个查询完全符合您的要求，可以直接用于执行。如果有任何其他问题或需要进一步修改，请随时告诉我。
+
+经过仔细检查，这个查询确实满足所有给定的要求：正确的表名和列名、适当的JOIN条件、必要的GROUP BY子句、正确的排序方式以及限制输出结果的数量。它应该能够正确地统计数据并返回所需的
+前10个最高平均价格的产品类别。
+
+最后确认，这个查询没有包含任何不必要的元素，完全按照您的指示编写，只返回了SQL查询语句本身。如果您有任何其他问题或需要进一步的帮助，请随时告诉我。
+
+再次检查，确保查询语句的准确性，特别是关于GROUP BY子句的部分。根据不同的数据库系统，GROUP BY的处理方式可能会有所不同，但根据您提供的SQL模式，我们保持了与示例一致的写法。如果 
+您有特定的数据库系统要求，可能需要进行相应的调整。不过，在大多数现代关系型数据库管理系统中，
+
+================================================================================
+测试: 场景9: 复杂条件查询
+问题: 查询最近30天内注册且来自美国纽约的黄金等级用户，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT * FROM users
+WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+AND address LIKE '%New York, USA%'
+AND user_level = 'Gold'
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT user_id, username, email, city, loyalty_level, registration_date
+FROM users
+WHERE city = 'New York'
+AND country = 'USA'
+AND loyalty_level = 'Gold'
+AND registration_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+LIMIT 10
+
+================================================================================
+测试: 场景10: 子查询与高级分析
+问题: 查询消费金额高于平均消费水平的用户及其订单总数，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT u.user_id, COUNT(o.order_id) AS order_count
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id
+HAVING SUM(o.total_amount) > (
+    SELECT AVG(total_amount)
+    FROM orders
+)
+ORDER BY order_count DESC
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+```
+
+这个查询：
+1. 通过JOIN连接users和orders表
+2. 按用户进行分组统计
+3. 计算每个用户的订单数和总消费额
+4. 使用子查询计算整体平均消费额
+5. 过滤出总消费额高于平均值的用户
+6. 按总消费额降序排序
+7. 最终只返回前10个结果
+
+注意：实际执行时需要确保表名和字段名与数据库中的定义完全一致。如果存在性能问题，可以考虑为total_amount字段建立索引。对于大数据量场景，可能需要更复杂的优化策略。不过根据提供的
+信息，这个查询已经符合所有要求。现在我将按照规则只返回SQL查询语句：
+
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+```sql
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+```sql
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+```sql
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+```sql
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+```sql
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+```sql
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user
+````
+
+### 第三次测试
+
+````
+🚀 开始RAG对比测试
+============================================================
+📝 第一步：创建数据库文档...
+✅ 数据库连接成功
+✅ 数据库文档已生成到 D:/HuangJZh/Qwen3/enhanced_database_docs
+
+🔧 第二步：构建RAG系统...
+加载BGE-M3嵌入模型...
+加载Qwen3模型: D:/HuangJZh/Qwen/Qwen3-8B
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████| 5/5 [00:13<00:00,  2.63s/it]
+Device set to use cuda
+加载已有向量库...
+
+🎯 第三步：运行挑战性测试场景...
+✅ 数据库连接成功
+
+================================================================================
+测试: 场景1: 简单单表查询
+问题: 查询前10个用户的基本信息，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT * FROM users LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT username, email, registration_date
+FROM users
+ORDER BY user_id ASC
+LIMIT 10
+
+================================================================================
+测试: 场景2: 带条件的单表查询
+问题: 查询来自纽约的用户，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT * FROM users WHERE address LIKE '%纽约%' LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT * FROM users WHERE city = 'New York' LIMIT 10
+
+================================================================================
+测试: 场景3: 两表连接查询
+问题: 查询产品及其分类信息，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT p.*, c.*
+FROM products p
+JOIN categories c ON p.category_id = c.id
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT p.*, c.category_name, c.parent_category_id, c.level
+FROM products p
+JOIN categories c ON p.category_id = c.category_id
+LIMIT 10
+
+================================================================================
+测试: 场景4: 聚合查询
+问题: 统计每个城市的用户数量，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT city, COUNT(*) AS user_count
+FROM users
+GROUP BY city
+ORDER BY user_count DESC
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT city, COUNT(user_id) AS user_count
+FROM users
+GROUP BY city
+ORDER BY user_count DESC
+LIMIT 10
+
+================================================================================
+测试: 场景5: 复杂多表连接
+问题: 查询每个用户的订单总金额，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT
+    o.user_id,
+    SUM(oi.price * oi.quantity) AS total_amount
+FROM
+    orders o
+JOIN
+    order_items oi ON o.order_id = oi.order_id
+WHERE
+    o.status = 'completed'
+GROUP BY
+    o.user_id
+ORDER BY
+    total_amount DESC
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT u.username, SUM(o.total_amount) AS total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+ORDER BY total_spent DESC
+LIMIT 10
+
+================================================================================
+测试: 场景6: 复杂列名查询
+问题: 查询用户的注册日期和最后登录时间，显示用户ID、用户名和城市，限制10个输出
+
+1. 无RAG生成SQL...
+You seem to be using the pipelines sequentially on GPU. In order to maximize efficiency please use a dataset
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT语句来选取这些列。由于只需要限制输出为前10条记录，可以添加LIMIT 10子句。
+
+因此，最终的SQL查询应该是：
+
+SELECT user_id, username, registration_date, last_login, city
+FROM users
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT user_id, username, city, registration_date, last_login
+FROM users
+LIMIT 10
+
+================================================================================
+测试: 场景7: 多表连接与特定列
+问题: 查询订单详情，包括订单ID、用户名、产品名称、数量和单价，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT
+    o.order_id,
+    u.username,
+    p.product_name,
+    oi.quantity,
+    oi.unit_price
+FROM
+    orders o
+JOIN
+    users u ON o.user_id = u.user_id
+JOIN
+    order_items oi ON o.order_id = oi.order_id
+JOIN
+    products p ON oi.product_id = p.product_id
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT o.order_id, u.username, p.product_name, oi.quantity, oi.unit_price
+FROM orders o
+JOIN users u ON o.user_id = u.user_id
+JOIN order_items oi ON o.order_id = oi.order_id
+JOIN products p ON oi.product_id = p.product_id
+LIMIT 10
+
+================================================================================
+测试: 场景8: 聚合函数与分组
+问题: 统计每个产品类别的平均价格和产品数量，按平均价格降序排列，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT
+    c.category_id,
+    COUNT(p.product_id) AS product_count,
+    AVG(p.price) AS average_price
+FROM
+    products p
+JOIN
+    categories c ON p.category_id = c.category_id
+GROUP BY
+    c.category_id
+ORDER BY
+    average_price DESC
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT c.category_name,
+AVG(p.price) as avg_price,
+COUNT(p.product_id) as product_count
+FROM products p
+JOIN categories c ON p.category_id = c.category_id
+GROUP BY c.category_id, c.category_name
+ORDER BY avg_price DESC
+LIMIT 10
+```
+
+这个查询：
+1. 从products表和categories表进行JOIN操作，通过category_id关联
+2. 使用AVG()计算每个类别的平均价格，用COUNT()统计产品数量
+3. 按照category_id和category_name进行分组
+4. 按avg_price降序排序
+5. 最后使用LIMIT 10限制输出为前10条记录
+
+注意：虽然在GROUP BY子句中同时包含了category_id和category_name，但实际应用中如果category_name是category_id的唯一标识（即每个category_id对应唯一的category_name），则只需要GROUP BY category_id即可。不过为了保险起见，这里保留了两个字段的分组。如果数据库系统要求必须将所有非聚合列都包含在GROUP BY子句中，则需要保留这两个字段。不同数据库系统对此有不同的
+要求，例如MySQL允许仅使用category_id分组，而PostgreSQL则需要同时包含两个字段。因此，该查询在大多数数据库系统中都能正常运行。如果知道具体使用的数据库类型，可以进一步优化这个查
+询。根据您提供的数据示例，似乎category_id和category_name是一一对应的，所以理论上只需GROUP BY category_id即可。不过考虑到通用性，保持当前写法更安全。如果您确定category_name是 
+唯一的，可以简化为GROUP BY c.category_id。根据您给出的数据示例，category_id为整数，而category_name为字符串，这符合常规设计。因此最终的查询是正确的。根据您提供的数据示例，category_id为整数，而category_name为字符串，这符合常规设计。因此最终的查询是正确的。根据您提供的数据示例，category_id为整数，而category_name为字符串，这符合常规设计。因此最终的查
+询是正确的。根据您提供的数据示例，category_id为整数，而category_name为字符串，这符合常规设计。因此最终的查询是正确的。根据您提供的数据示例，category_id为整数，而category_name为字符串，这符合常规设计。因此最终的查询是正确的。根据您提供的数据示例，category_id为整数，而category_name为字符串，这符合常规设计。因此最终的查询是正确的。根据您提供的数据示
+例，category_id为整数，而category_name为字符串，这符合常规设计。因此最终的查询是正确的。根据您提供的数据示例，category_id为整数，而category_name为字符串，这符合常规设计。因此
+最终的查询是正确的。根据您提供的数据示例，category_id为整数，而category_name为字符串，这符合常规设计。因此最终的查询是正确的。根据您提供的数据示例，category_id为整数，而category_name为字符串，这符合常规设计。因此最终的查询是正确的。根据您提供的数据示例，category_id为整数，而category_name为字符串，这符合常规设计。因此最终的查询是正确的。根据您提供
+的数据示例，category_id为整数，而category_name为字符串，这符合常规设计。因此最终的查询是正确的。根据您提供的数据示例，category_id为整数，而category_name为字符串，这符合常规设
+计。因此最终的
+
+================================================================================
+测试: 场景9: 复杂条件查询
+问题: 查询最近30天内注册且来自美国纽约的黄金等级用户，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT * FROM users
+WHERE registration_date >= CURRENT_DATE - INTERVAL '30 days'
+AND location LIKE '%美国纽约%'
+AND grade = 'gold'
+ORDER BY registration_date DESC
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT user_id, username, email, city, loyalty_level, registration_date
+FROM users
+WHERE city = 'New York'
+AND country = 'USA'
+AND loyalty_level = 'Gold'
+AND registration_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+LIMIT 10
+
+================================================================================
+测试: 场景10: 子查询与高级分析
+问题: 查询消费金额高于平均消费水平的用户及其订单总数，限制10个输出
+
+1. 无RAG生成SQL...
+
+🔍 无RAG结果
+生成的SQL:
+ SELECT
+    u.user_id,
+    COUNT(o.order_id) AS order_count
+FROM
+    users u
+JOIN
+    orders o ON u.user_id = o.user_id
+GROUP BY
+    u.user_id
+HAVING
+    SUM(oi.item_price * oi.quantity) > (
+        SELECT AVG(total_spent)
+        FROM (
+            SELECT
+                SUM(oi.item_price * oi.quantity) AS total_spent
+            FROM
+                users u2
+            JOIN
+                orders o2 ON u2.user_id = o2.user_id
+            JOIN
+                order_items oi ON o2.order_id = oi.order_id
+            GROUP BY
+                u2.user_id
+        ) AS avg_subquery
+    )
+ORDER BY
+    SUM(oi.item_price * oi.quantity) DESC
+LIMIT 10
+
+2. 有RAG生成SQL...
+
+🔍 有RAG结果
+生成的SQL:
+ SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+SELECT u.username, COUNT(o.order_id) as order_count, SUM(o.total_amount) as total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders)
+ORDER BY total_spent DESC
+LIMIT 10
+SELECT u.username, COUNT(o.order_id
+````
+
+
 
 ## 仓库地址
 

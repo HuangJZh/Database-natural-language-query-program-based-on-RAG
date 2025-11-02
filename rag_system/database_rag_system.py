@@ -237,7 +237,7 @@ class AdvancedRAGSystem:
         model = AutoModelForCausalLM.from_pretrained(
             self.config.LLM_MODEL_NAME,
             device_map="cuda",
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
             trust_remote_code=True
         )
 
@@ -492,7 +492,7 @@ def generate_business_logic():
 
 def create_enhanced_database_docs(db_config, output_dir):
     """创建数据库文档"""
-    extractor = DatabaseKnowledgeExtractor(db_config, "D:/HuangJZh/Qwen/Qwen3-8B")
+    extractor = DatabaseKnowledgeExtractor(db_config, "D:/Qwen/Qwen/Qwen3-8B")
     extractor.connect()
     
     # 提取更详细的信息
@@ -528,11 +528,11 @@ def create_enhanced_database_docs(db_config, output_dir):
 
 
 class Config:
-    DOCUMENTS_DIR = "D:/HuangJZh/Qwen3/enhanced_database_docs"
+    DOCUMENTS_DIR = "D:/Qwen/Qwen3/enhanced_database_docs"
     CHUNK_SIZE = 600
     CHUNK_OVERLAP = 80
     EMBEDDING_MODEL_NAME = "BAAI/bge-m3"  
-    LLM_MODEL_NAME = "D:/HuangJZh/Qwen/Qwen3-8B"  
+    LLM_MODEL_NAME = "D:/Qwen/Qwen/Qwen3-8B"  
     VECTOR_DB_DIR = "vector_db_enhanced"
     TOP_K = 4
 
