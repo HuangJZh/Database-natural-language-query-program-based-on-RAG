@@ -199,3 +199,8 @@ cd rag_system
 
 
 python database_rag_system.py
+
+
+##运行实时对话系统
+
+python rag_chat_system.py
