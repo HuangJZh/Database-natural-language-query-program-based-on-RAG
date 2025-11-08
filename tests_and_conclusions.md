@@ -2195,7 +2195,13 @@ SELECT u.username, COUNT(o.order_id
 
 ## 仓库地址
 
+初步代码，较大显存需求（16G以上）
+
 https://github.com/HuangJZh/Database-natural-language-query-program-based-on-RAG/tree/main
+
+较小的显存需求（约8G），实现实时对话查询系统
+
+https://github.com/HuangJZh/Database-natural-language-query-program-based-on-RAG/tree/Database-natural-language-query-program-based-on-RAG-small
 
 ## 核心源代码
 
