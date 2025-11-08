@@ -1,0 +1,41 @@
+表详细文档: orders
+============================================================
+
+列详细信息:
+- order_id: int | Null: NO | Key: PRI | Default: None
+- user_id: int | Null: NO | Key: MUL | Default: None
+- order_date: datetime | Null: NO | Key: MUL | Default: None
+- status: enum('pending','confirmed','shipped','delivered','cancelled','refunded') | Null: YES | Key: MUL | Default: None
+- total_amount: decimal(12,2) | Null: NO | Key:  | Default: None
+- shipping_cost: decimal(8,2) | Null: YES | Key:  | Default: 0.00
+- tax_amount: decimal(8,2) | Null: YES | Key:  | Default: 0.00
+- discount_amount: decimal(8,2) | Null: YES | Key:  | Default: 0.00
+- payment_method: enum('credit_card','debit_card','paypal','bank_transfer','cash') | Null: YES | Key:  | Default: None
+- payment_status: enum('pending','paid','failed','refunded') | Null: YES | Key: MUL | Default: None
+- shipping_address: text | Null: YES | Key:  | Default: None
+- billing_address: text | Null: YES | Key:  | Default: None
+- tracking_number: varchar(100) | Null: YES | Key:  | Default: None
+- estimated_delivery: date | Null: YES | Key:  | Default: None
+- actual_delivery: date | Null: YES | Key:  | Default: None
+- created_at: timestamp | Null: YES | Key:  | Default: CURRENT_TIMESTAMP
+- updated_at: timestamp | Null: YES | Key:  | Default: CURRENT_TIMESTAMP
+
+索引信息:
+- order_id (BTREE) - 唯一
+- user_id (BTREE) - 非唯一
+- order_date (BTREE) - 非唯一
+- status (BTREE) - 非唯一
+- payment_status (BTREE) - 非唯一
+
+数据示例 (10 行):
+   order_id  user_id          order_date     status total_amount shipping_cost tax_amount discount_amount payment_method payment_status     shipping_address      billing_address tracking_number estimated_delivery actual_delivery          created_at          updated_at
+0         1     3350 2025-05-26 08:30:50    pending      1381.79         11.33     110.54          334.36     debit_card           paid  953 Main St, City13  135 Main St, City96     TRK00000001         2025-06-03            None 2025-10-29 08:30:49 2025-10-29 08:30:49
+1         2     4564 2025-02-05 08:30:50  delivered       873.82         25.88      69.91          119.86     debit_card           paid  163 Main St, City24  964 Main St, City19     TRK00000002         2025-02-19      2025-02-19 2025-10-29 08:30:49 2025-10-29 08:30:49
+2         3     3567 2025-08-06 08:30:50  delivered      1651.73         49.77     132.14          224.81     debit_card        pending  152 Main St, City29  657 Main St, City47     TRK00000003         2025-08-10      2025-08-13 2025-10-29 08:30:49 2025-10-29 08:30:49
+3         4     3593 2024-12-15 08:30:50  delivered      1542.98         42.33     123.44          398.68  bank_transfer        pending  864 Main St, City38  573 Main St, City22     TRK00000004         2024-12-22      2024-12-30 2025-10-29 08:30:49 2025-10-29 08:30:49
+4         5     1894 2025-01-30 08:30:50  delivered       339.31         14.92      27.14           45.76           cash           paid  663 Main St, City46  340 Main St, City89     TRK00000005         2025-02-04      2025-02-10 2025-10-29 08:30:49 2025-10-29 08:30:49
+5         6     4975 2025-09-20 08:30:50    shipped      1200.02         25.91      96.00           45.72         paypal         failed  209 Main St, City61  638 Main St, City32     TRK00000006         2025-09-28      2025-09-30 2025-10-29 08:30:49 2025-10-29 08:30:49
+6         7     4384 2025-07-09 08:30:50   refunded      1219.57         25.88      97.57          272.62           cash         failed  924 Main St, City47  324 Main St, City71     TRK00000007         2025-07-15            None 2025-10-29 08:30:49 2025-10-29 08:30:49
+7         8     4458 2025-04-19 08:30:50  delivered       597.61          5.12      47.81           84.43         paypal       refunded  425 Main St, City58  972 Main St, City34     TRK00000008         2025-04-25      2025-04-28 2025-10-29 08:30:49 2025-10-29 08:30:49
+8         9     1615 2025-07-27 08:30:50  confirmed      1632.17         18.97     130.57          186.49     debit_card           paid  407 Main St, City64  655 Main St, City29     TRK00000009         2025-07-31            None 2025-10-29 08:30:49 2025-10-29 08:30:49
+9        10     1423 2025-10-28 08:30:50  confirmed      1677.56          9.16     134.20          300.12     debit_card        pending  512 Main St, City83   310 Main St, City2     TRK00000010         2025-11-06            None 2025-10-29 08:30:49 2025-10-29 08:30:49

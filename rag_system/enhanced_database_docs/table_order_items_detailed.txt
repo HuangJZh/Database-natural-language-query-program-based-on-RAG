@@ -1,0 +1,30 @@
+表详细文档: order_items
+============================================================
+
+列详细信息:
+- order_item_id: int | Null: NO | Key: PRI | Default: None
+- order_id: int | Null: NO | Key: MUL | Default: None
+- product_id: int | Null: NO | Key: MUL | Default: None
+- quantity: int | Null: NO | Key:  | Default: None
+- unit_price: decimal(10,2) | Null: NO | Key:  | Default: None
+- discount: decimal(8,2) | Null: YES | Key:  | Default: 0.00
+- line_total: decimal(10,2) | Null: YES | Key:  | Default: None
+- created_at: timestamp | Null: YES | Key:  | Default: CURRENT_TIMESTAMP
+
+索引信息:
+- order_item_id (BTREE) - 唯一
+- order_id (BTREE) - 非唯一
+- product_id (BTREE) - 非唯一
+
+数据示例 (10 行):
+   order_item_id  order_id  product_id  quantity unit_price discount line_total          created_at
+0              1     10697         901         5     440.09    65.87    1871.10 2025-10-29 08:30:51
+1              2      6985        1378         3     294.67    33.86     782.43 2025-10-29 08:30:51
+2              3     17309         551         5     280.44     9.53    1354.55 2025-10-29 08:30:51
+3              4     16620        1412         2     428.95    54.25     749.40 2025-10-29 08:30:51
+4              5     13509        2034         5     445.36     3.32    2210.20 2025-10-29 08:30:51
+5              6     10898         361         1     358.07    38.86     319.21 2025-10-29 08:30:51
+6              7     18898        2312         2      40.63     0.24      80.78 2025-10-29 08:30:51
+7              8     23380         726         4     343.25    47.69    1182.24 2025-10-29 08:30:51
+8              9      9588        1878         3     289.67    55.65     702.06 2025-10-29 08:30:51
+9             10     18106        1655         4     399.71    12.87    1547.36 2025-10-29 08:30:51

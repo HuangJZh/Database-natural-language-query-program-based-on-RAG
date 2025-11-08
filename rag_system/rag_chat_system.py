@@ -95,7 +95,7 @@ class DatabaseKnowledgeExtractor:
         """提取样本数据用于理解数据分布"""
         sample_data = {}
         
-        tables = ["users", "products", "orders", "order_items", "categories"]
+        tables = ["users", "products", "orders", "order_items", "categories","inventory","inventory"]
         
         for table in tables:
             try:
@@ -205,7 +205,7 @@ SQL查询:"""
 
 问题: {question}
 
-请只返回SQL查询语句:"""
+只返回SQL语句:"""
         
         result = self.llm.invoke(prompt)
         return self._extract_sql_from_response(result)
@@ -329,6 +329,55 @@ def generate_query_patterns():
             "pattern": "复杂多表连接",
             "description": "查询每个用户的订单总金额",
             "sql": "SELECT u.username, SUM(o.total_amount) as total_spent FROM users u JOIN orders o ON u.user_id = o.user_id GROUP BY u.user_id, u.username ORDER BY total_spent DESC"
+        },
+        {
+            "pattern": "复杂列名查询",
+            "description": "查询用户的注册日期和最后登录时间，显示用户ID、用户名和城市，限制10个输出",
+            "sql": "SELECT user_id, username, city, registration_date, last_login FROM users LIMIT 10"
+        },
+        {
+            "pattern": "多表连接与特定列", 
+            "description": "查询订单详情，包括订单ID、用户名、产品名称、数量和单价，限制10个输出",
+            "sql": """SELECT o.order_id, u.username, p.product_name, oi.quantity, oi.unit_price 
+FROM orders o 
+JOIN users u ON o.user_id = u.user_id 
+JOIN order_items oi ON o.order_id = oi.order_id 
+JOIN products p ON oi.product_id = p.product_id 
+LIMIT 10"""
+        },
+        {
+            "pattern": "聚合函数与分组",
+            "description": "统计每个产品类别的平均价格和产品数量，按平均价格降序排列，限制10个输出",
+            "sql": """SELECT c.category_name, 
+AVG(p.price) as avg_price, 
+COUNT(p.product_id) as product_count 
+FROM products p 
+JOIN categories c ON p.category_id = c.category_id 
+GROUP BY c.category_id, c.category_name 
+ORDER BY avg_price DESC"""
+        },
+        {
+            "pattern": "复杂条件查询",
+            "description": "查询最近30天内注册且来自美国纽约的黄金等级用户，限制10个输出",
+            "sql": """SELECT user_id, username, email, city, loyalty_level, registration_date 
+FROM users 
+WHERE city = 'New York' 
+AND country = 'USA' 
+AND loyalty_level = 'Gold' 
+AND registration_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)"""
+        },
+        {
+            "pattern": "子查询与高级分析",
+            "description": "查询消费金额高于平均消费水平的用户及其订单总数，限制10个输出",
+            "sql": """SELECT u.username, 
+COUNT(o.order_id) as order_count, 
+SUM(o.total_amount) as total_spent 
+FROM users u 
+JOIN orders o ON u.user_id = o.user_id 
+GROUP BY u.user_id, u.username 
+HAVING total_spent > (SELECT AVG(total_amount) FROM orders) 
+ORDER BY total_spent DESC 
+LIMIT 10"""
         }
     ]
     
@@ -397,11 +446,11 @@ def create_enhanced_database_docs(db_config, output_dir):
 
 
 class Config:
-    DOCUMENTS_DIR = "D:/Qwen/Qwen3/enhanced_database_docs"
+    DOCUMENTS_DIR = "D:/Qwen/Qwen3/rag_system/enhanced_database_docs"
     CHUNK_SIZE = 400
     CHUNK_OVERLAP = 80
     EMBEDDING_MODEL_NAME = "BAAI/bge-small-zh-v1.5"  
-    LLM_MODEL_NAME = "D:/Qwen/Qwen/Qwen3-8B"  
+    LLM_MODEL_NAME = "D:/Qwen/Qwen/Qwen3-4B"  
     VECTOR_DB_DIR = "vector_db_enhanced"
     TOP_K = 3
 
