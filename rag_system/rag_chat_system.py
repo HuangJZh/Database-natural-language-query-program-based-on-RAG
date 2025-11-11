@@ -108,11 +108,11 @@ class DatabaseKnowledgeExtractor:
 
 
 class AdvancedRAGSystem:
-    def __init__(self, config, db_config):
+    def __init__(self, config, db_config, llm=None, embeddings=None, init_llm=True, init_embeddings=True):
         self.config = config
         self.db_config = db_config
-        self.embeddings = self._init_embeddings()
-        self.llm = self._init_llm()
+        self.embeddings = embeddings if embeddings is not None else (self._init_embeddings() if init_embeddings else None)
+        self.llm = llm if llm is not None else (self._init_llm() if init_llm else None)
         self.vector_db = None
         self.qa_chain = None
         
@@ -159,6 +159,38 @@ class AdvancedRAGSystem:
         )
 
         return HuggingFacePipeline(pipeline=pipe)
+    
+    def ensure_llm(self):
+        if self.llm is None:
+            self.llm = self._init_llm()
+            
+    def ensure_embeddings(self):
+        if self.embeddings is None:
+            self.embeddings = self._init_embeddings()
+            
+    def unload_embeddings(self):
+        try:
+            self.embeddings = None
+            import gc
+            gc.collect()
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+        except Exception:
+            pass
+        
+    def unload_llm(self):
+        try:
+            self.llm = None
+            import gc
+            gc.collect()
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+        except Exception:
+            pass
     
     def load_rag_system(self):
         """加载RAG系统"""
@@ -208,12 +240,48 @@ SQL查询:"""
 问题: {question}
 
 只返回SQL语句:"""
-        
+        self.ensure_llm()
         result = self.llm.invoke(prompt)
         return self._extract_sql_from_response(result)
     
     def generate_sql_with_rag(self, question: str) -> Tuple[str, List]:
         """使用RAG生成SQL"""
+        if self.qa_chain is None:
+            try:
+                self.ensure_embeddings()
+            except Exception:
+                pass
+            try:
+                if os.path.exists(self.config.VECTOR_DB_DIR):
+                    self.load_rag_system()
+                else:
+                    if os.path.exists(self.config.DOCUMENTS_DIR):
+                        loader = DirectoryLoader(
+                            self.config.DOCUMENTS_DIR,
+                            glob="*.txt",
+                            loader_cls=TextLoader,
+                            loader_kwargs={"encoding": "utf-8"}
+                        )
+                        documents = loader.load()
+                        
+                        text_splitter = RecursiveCharacterTextSplitter(
+                            chunk_size=self.config.CHUNK_SIZE,
+                            chunk_overlap=self.config.CHUNK_OVERLAP,
+                            separators=["\n\n", "\n", "。", "，", "；", "、", " ", ""]
+                        )
+                        texts = text_splitter.split_documents(documents)
+                        self.ensure_embeddings()
+                        self.vector_db = Chroma.from_documents(
+                            documents=texts,
+                            embedding=self.embeddings,
+                            persist_directory=self.config.VECTOR_DB_DIR
+                        )
+                        self.vector_db.persist()
+                        self.load_rag_system()
+            except Exception as e:
+                pass
+        if self.qa_chain is None:
+            return self.generate_sql_without_rag(question), []
         result = self.qa_chain.invoke({"query": question}) 
         sql = self._extract_sql_from_response(result["result"])
         return sql, result["source_documents"]
@@ -461,11 +529,13 @@ class Config:
 
 
 class DatabaseDialogueSystem:
-    def __init__(self, config, db_config):
+    def __init__(self, config, db_config, llm=None, embeddings=None):
         self.config = config
         self.db_config = db_config
         self.rag_system = None
         self.history = []
+        self._embeddings = embeddings
+        self._llm = llm
         
     def initialize_system(self):
         """初始化系统"""
@@ -481,7 +551,7 @@ class DatabaseDialogueSystem:
         
         # 第二步：构建RAG系统
         print("\n🔧 构建RAG系统...")
-        self.rag_system = AdvancedRAGSystem(self.config, self.db_config)
+        self.rag_system = AdvancedRAGSystem(self.config, self.db_config, llm=self._llm, embeddings=self._embeddings, init_llm=False if self._llm else True, init_embeddings=False if self._embeddings else True)
         
         # 如果向量库不存在，则创建
         if not os.path.exists(self.config.VECTOR_DB_DIR):
