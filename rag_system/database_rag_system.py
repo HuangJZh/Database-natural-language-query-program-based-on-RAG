@@ -214,13 +214,13 @@ LIMIT 10""",
 
 
 class AdvancedRAGSystem:
-    def __init__(self, config, db_config):
+    def __init__(self, config, db_config, llm=None, embeddings=None, init_llm=True, init_embeddings=True):
         self.config = config
         self.db_config = db_config
-        self.embeddings = self._init_embeddings()
-        self.llm = self._init_llm()
         self.vector_db = None
         self.qa_chain = None
+        self.llm = llm if llm is not None else (self._init_llm() if init_llm else None)
+        self.embeddings = embeddings if embeddings is not None else (self._init_embeddings() if init_embeddings else None)
         
     def _init_embeddings(self):
         print("加载bge-small-zh-v1.5嵌入模型...")
@@ -250,7 +250,7 @@ class AdvancedRAGSystem:
             # device_map="cuda",
             device_map="auto",
             dtype=torch.float16,
-            trust_remote_code=True
+            trust_remote_code=True,
         )
 
         pipe = pipeline(
@@ -265,6 +265,38 @@ class AdvancedRAGSystem:
         )
 
         return HuggingFacePipeline(pipeline=pipe)
+    
+    def ensure_llm(self):
+        if self.llm is None:
+            self.llm = self._init_llm()
+
+    def ensure_embeddings(self):
+        if self.embeddings is None:
+            self.embeddings = self._init_embeddings()
+
+    def unload_embeddings(self):
+        try:
+            self.embeddings = None
+            import gc
+            gc.collect()
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    def unload_llm(self):
+        try:
+            self.llm = None
+            import gc
+            gc.collect()
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+        except Exception:
+            pass
     
     def load_rag_system(self):
         """加载RAG系统"""
@@ -309,6 +341,7 @@ SQL查询:"""
     
     def generate_sql_without_rag(self, question: str) -> str:
         """不使用RAG生成SQL（基础版本）"""
+        self.ensure_llm()
         prompt = f"""请为以下问题生成SQL查询语句。数据库包含users, products, orders, order_items, categories等表。
 
 问题: {question}
@@ -319,6 +352,40 @@ SQL查询:"""
         return self._extract_sql_from_response(result)
     
     def generate_sql_with_rag(self, question: str) -> Tuple[str, List]:
+        if self.qa_chain is None:
+            try:
+                self.ensure_embeddings()
+            except Exception:
+                pass
+            try:
+                if os.path.exists(self.config.VECTOR_DB_DIR):
+                    self.load_rag_system()
+                else:
+                    if os.path.exists(self.config.DOCUMENTS_DIR):
+                        loader = DirectoryLoader(
+                            self.config.DOCUMENTS_DIR,
+                            glob="*.txt",
+                            loader_cls=TextLoader,
+                            loader_kwargs={"encoding": "utf-8"}
+                        )
+                        documents = loader.load()
+                        text_splitter = RecursiveCharacterTextSplitter(
+                            chunk_size=self.config.CHUNK_SIZE,
+                            chunk_overlap=self.config.CHUNK_OVERLAP,
+                            separators=["\n\n", "\n", "。", "，", "；", "、", " ", ""]
+                        )
+                        texts = text_splitter.split_documents(documents)
+                        if self.embeddings is None:
+                            self.ensure_embeddings()
+                        self.vector_db = Chroma.from_documents(
+                            documents=texts,
+                            embedding=self.embeddings,
+                            persist_directory=self.config.VECTOR_DB_DIR
+                        )
+                        self.vector_db.persist()
+                        self.load_rag_system()
+            except Exception:
+                pass
         """使用RAG生成SQL"""
         result = self.qa_chain.invoke({"query": question}) 
         sql = self._extract_sql_from_response(result["result"])
