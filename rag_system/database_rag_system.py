@@ -226,7 +226,8 @@ class AdvancedRAGSystem:
         print("加载bge-small-zh-v1.5嵌入模型...")
         return HuggingFaceBgeEmbeddings(
             model_name=self.config.EMBEDDING_MODEL_NAME,
-            model_kwargs={'device': 'cuda' if torch.cuda.is_available() else 'cpu'},
+            # model_kwargs={'device': 'cuda' if torch.cuda.is_available() else 'cpu'},
+            model_kwargs={'device': 'cpu'},
             encode_kwargs={'normalize_embeddings': True},
             query_instruction="为这个句子生成表示以用于检索相关文章："
         )
@@ -246,7 +247,8 @@ class AdvancedRAGSystem:
         model = AutoModelForCausalLM.from_pretrained(
             self.config.LLM_MODEL_NAME,
             quantization_config=quantization_config,  # 使用新的参数
-            device_map="cuda",
+            # device_map="cuda",
+            device_map="auto",
             dtype=torch.float16,
             trust_remote_code=True
         )
@@ -502,7 +504,8 @@ def generate_business_logic():
 
 def create_enhanced_database_docs(db_config, output_dir):
     """创建数据库文档"""
-    extractor = DatabaseKnowledgeExtractor(db_config, "D:/Qwen/Qwen/Qwen3-8B")
+    # extractor = DatabaseKnowledgeExtractor(db_config, "D:/Qwen/Qwen/Qwen3-8B")
+    extractor = DatabaseKnowledgeExtractor(db_config, "../Qwen/Qwen3-8B")
     extractor.connect()
     
     # 提取更详细的信息
@@ -538,11 +541,13 @@ def create_enhanced_database_docs(db_config, output_dir):
 
 
 class Config:
-    DOCUMENTS_DIR = "D:/Qwen/Qwen3/enhanced_database_docs"
+    # DOCUMENTS_DIR = "D:/Qwen/Qwen3/enhanced_database_docs"
+    DOCUMENTS_DIR = "enhanced_database_docs"
     CHUNK_SIZE = 400
     CHUNK_OVERLAP = 80
     EMBEDDING_MODEL_NAME = "BAAI/bge-small-zh-v1.5"  
-    LLM_MODEL_NAME = "D:/Qwen/Qwen/Qwen3-8B"  
+    # LLM_MODEL_NAME = "D:/Qwen/Qwen/Qwen3-8B"  
+    LLM_MODEL_NAME = "../Qwen/Qwen3-8B"
     VECTOR_DB_DIR = "vector_db_enhanced"
     TOP_K = 3
 

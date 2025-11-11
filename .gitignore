@@ -1,0 +1,8 @@
+Qwen
+.venv
+.lock
+*/__pycache__
+._____temp
+Qwen3
+rag_system/vector_db_enhanced
+rag_system/enhanced_database_docs
