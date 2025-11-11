@@ -346,7 +346,7 @@ SQL查询:"""
 
 问题: {question}
 
-请只返回SQL查询语句:"""
+**请只返回SQL查询语句**:"""
         
         result = self.llm.invoke(prompt)
         return self._extract_sql_from_response(result)
