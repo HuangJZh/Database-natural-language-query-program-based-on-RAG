@@ -43,6 +43,13 @@
     .stat{display:inline-block;min-width:160px;margin-right:12px;color:var(--muted)}
     .muted{color:var(--muted)}
     .badge{display:inline-block;padding:6px 10px;border-radius:6px;background:#f1f5f9;border:1px solid var(--border);font-weight:600;color:var(--muted)}
+    
+    /* 表格样式 */
+    .result-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.9rem; }
+    .result-table th { background: #f8fafc; text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); font-weight: 600; color: var(--muted); }
+    .result-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; }
+    .result-table tr:last-child td { border-bottom: none; }
+    .result-info { color: var(--muted); font-size: 0.9rem; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -99,7 +106,10 @@
           <pre id="sql">(none)</pre>
 
           <h3>执行结果</h3>
-          <pre id="result">(none)</pre>
+          <div id="result-container">
+            <div id="result-status" class="result-info"></div>
+            <div id="result-table-container"></div>
+          </div>
 
           <h3>错误 / 信息</h3>
           <pre id="error">(none)</pre>
@@ -127,7 +137,9 @@
     const btnSend = document.getElementById('btn-send');
     const questionEl = document.getElementById('question');
     const sqlEl = document.getElementById('sql');
-    const resultEl = document.getElementById('result');
+    const resultContainer = document.getElementById('result-container');
+    const resultStatus = document.getElementById('result-status');
+    const resultTableContainer = document.getElementById('result-table-container');
     const errorEl = document.getElementById('error');
     const historyEl = document.getElementById('history');
     const loadingEl = document.getElementById('loading');
@@ -138,6 +150,38 @@
     const gpuAvailEl = document.getElementById('gpu-avail');
     const gpuCountEl = document.getElementById('gpu-count');
     const gpuDetailsEl = document.getElementById('gpu-details');
+
+    // 格式化查询结果为表格显示（类似rag_chat_system中的display_result方法）
+    function formatResultAsTable(result) {
+      if (!result || !Array.isArray(result) || result.length === 0) {
+        return '<div class="result-info">📋 查询结果: 无数据</div>';
+      }
+
+      const columns = Object.keys(result[0]);
+      let html = `<div class="result-info">📋 查询结果 (${result.length} 行):</div>`;
+      html += '<table class="result-table">';
+      
+      // 表头
+      html += '<thead><tr>';
+      columns.forEach(col => {
+        html += `<th>${escapeHtml(col)}</th>`;
+      });
+      html += '</tr></thead>';
+      
+      // 表体
+      html += '<tbody>';
+      result.forEach(row => {
+        html += '<tr>';
+        columns.forEach(col => {
+          const value = row[col];
+          html += `<td>${escapeHtml(String(value !== null && value !== undefined ? value : ''))}</td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      
+      return html;
+    }
 
     async function fetchStatus(){
       try{
@@ -365,7 +409,7 @@
             inner += `<div><b>执行：</b> ${with_exec.executed ? (with_exec.success ? '<span style="color:green">成功</span>' : '<span style="color:red">失败</span>') : '<span style="color:#666">未执行</span>'}</div>`;
             if(with_exec.executed){
               if(with_exec.success){
-                inner += `<div style="margin-top:6px"><b>查询结果：</b><pre>${escapeHtml(JSON.stringify(with_exec.result||[], null, 2))}</pre></div>`;
+                inner += `<div style="margin-top:6px"><b>查询结果：</b>${formatResultAsTable(with_exec.result||[])}</div>`;
               }else{
                 inner += `<div style="margin-top:6px"><b>错误信息：</b><pre>${escapeHtml(String(with_exec.error||''))}</pre></div>`;
               }
@@ -376,7 +420,7 @@
             inner += `<div><b>执行：</b> ${no_exec.executed ? (no_exec.success ? '<span style="color:green">成功</span>' : '<span style="color:red">失败</span>') : '<span style="color:#666">未执行</span>'}</div>`;
             if(no_exec.executed){
               if(no_exec.success){
-                inner += `<div style="margin-top:6px"><b>查询结果：</b><pre>${escapeHtml(JSON.stringify(no_exec.result||[], null, 2))}</pre></div>`;
+                inner += `<div style="margin-top:6px"><b>查询结果：</b>${formatResultAsTable(no_exec.result||[])}</div>`;
               }else{
                 inner += `<div style="margin-top:6px"><b>错误信息：</b><pre>${escapeHtml(String(no_exec.error||''))}</pre></div>`;
               }
@@ -388,7 +432,7 @@
             inner += `<div style="margin-top:8px"><b>生成的 SQL：</b><pre>${escapeHtml(sql) || '(无)'}</pre></div>`;
             inner += `<div style="margin-top:6px"><b>查询是否成功：</b> ${item.execution_success ? '<span style="color:green">是</span>' : '<span style="color:red">否</span>'}</div>`;
             if(item.execution_success){
-              inner += `<div style="margin-top:6px"><b>查询结果：</b><pre>${escapeHtml(JSON.stringify(item.execution_result||[], null, 2))}</pre></div>`;
+              inner += `<div style="margin-top:6px"><b>查询结果：</b>${formatResultAsTable(item.execution_result||[])}</div>`;
             }else if(item.error_message){
               inner += `<div style="margin-top:6px"><b>错误信息：</b><pre>${escapeHtml(String(item.error_message))}</pre></div>`;
             }
@@ -407,7 +451,8 @@
   if(!question) return alert('请输入问题');
       loadingEl.style.display = '';
       sqlEl.textContent = '(waiting)';
-      resultEl.textContent = '(waiting)';
+      resultStatus.textContent = '';
+      resultTableContainer.innerHTML = '';
       errorEl.textContent = '(waiting)';
       try{
         const r = await fetch('/query', {
@@ -428,18 +473,32 @@
             const withExec = j.with_rag_execution || {};
             let resultHtml = '';
             resultHtml += `<div><b>有RAG 执行：</b> ${withExec.executed ? (withExec.success ? '<span style="color:green">成功</span>' : '<span style="color:red">失败</span>') : '<span style="color:#666">未执行</span>'}</div>`;
-            if(withExec.executed){ resultHtml += `<pre>${escapeHtml(JSON.stringify(withExec.result||[], null, 2))}</pre>`; }
+            if(withExec.executed){ 
+              if(withExec.success){
+                resultHtml += formatResultAsTable(withExec.result||[]);
+              }else{
+                resultHtml += `<pre>${escapeHtml(String(withExec.error||''))}</pre>`;
+              }
+            }
             resultHtml += `<div style="margin-top:6px"><b>无RAG 执行：</b> ${noExec.executed ? (noExec.success ? '<span style="color:green">成功</span>' : '<span style="color:red">失败</span>') : '<span style="color:#666">未执行</span>'}</div>`;
-            if(noExec.executed){ resultHtml += `<pre>${escapeHtml(JSON.stringify(noExec.result||[], null, 2))}</pre>`; }
-            resultEl.innerHTML = resultHtml;
+            if(noExec.executed){ 
+              if(noExec.success){
+                resultHtml += formatResultAsTable(noExec.result||[]);
+              }else{
+                resultHtml += `<pre>${escapeHtml(String(noExec.error||''))}</pre>`;
+              }
+            }
+            resultTableContainer.innerHTML = resultHtml;
             errorEl.textContent = '';
           }else{
             sqlEl.textContent = j.sql_query || '(无 SQL)';
             if(j.execution_success){
-              try{ resultEl.textContent = JSON.stringify(j.execution_result, null, 2); }catch(e){ resultEl.textContent = String(j.execution_result); }
+              resultStatus.textContent = `✅ 查询成功，返回 ${Array.isArray(j.execution_result) ? j.execution_result.length : 0} 行结果`;
+              resultTableContainer.innerHTML = formatResultAsTable(j.execution_result);
               errorEl.textContent = '';
             }else{
-              resultEl.textContent = '';
+              resultStatus.textContent = '❌ 查询执行失败';
+              resultTableContainer.innerHTML = '';
               errorEl.textContent = j.error_message || '(无错误信息)';
             }
           }
@@ -448,11 +507,14 @@
           const text = await r.text();
           errorEl.textContent = text;
           sqlEl.textContent = '';
-          resultEl.textContent = '';
+          resultStatus.textContent = '';
+          resultTableContainer.innerHTML = '';
         }
       }catch(e){
         console.error(e);
         errorEl.textContent = String(e);
+        resultStatus.textContent = '';
+        resultTableContainer.innerHTML = '';
       }finally{
         loadingEl.style.display = 'none';
       }
