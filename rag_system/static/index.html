@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>基于RAG的自然语言SQL查询 项目实例演示</title>
+  <style>
+    /* Formal presentation styling */
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+    :root{
+      --bg:#f5f7fa;
+      --card:#ffffff;
+      --accent:#1f6feb;
+      --muted:#6b7280;
+      --border:#e6e9ef;
+    }
+    html,body{height:100%;margin:0;padding:0;}
+    body { 
+      font-family: 'Roboto', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; 
+      margin: 0;
+      padding: 24px;
+      background: var(--bg); 
+      color:#0f172a;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .container {
+      max-width: none;
+      width: 100%;
+      margin: 0 auto;
+    }
+    header{
+      display:flex;
+      align-items:flex-start;
+      gap:14px;
+      width: 100%;
+    }
+    h1 { 
+      margin:0; 
+      font-size:1.8rem; 
+      color:var(--accent); 
+      font-weight:700;
+      word-wrap: break-word;
+    }
+    .logo-bubble{
+      width:48px;
+      height:48px;
+      border-radius:8px;
+      background:var(--accent);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-weight:700;
+      box-shadow:0 2px 8px rgba(31,111,235,0.12);
+      flex-shrink: 0;
+    }
+    p.small { 
+      font-size:0.95rem; 
+      color:var(--muted); 
+      margin-top:6px;
+      word-wrap: break-word;
+    }
+
+    /* cards */
+    .card{
+      background:var(--card); 
+      padding:16px; 
+      border-radius:8px; 
+      box-shadow:0 2px 8px rgba(16,24,40,0.04); 
+      margin-top:12px; 
+      border:1px solid var(--border);
+      width: 100%;
+      box-sizing: border-box;
+    }
+    textarea{
+      width:100%;
+      height:120px;
+      padding:12px;
+      border-radius:6px;
+      border:1px solid var(--border);
+      font-size:1rem;
+      box-sizing:border-box;
+      resize: vertical;
+    }
+    /* limit the question textarea width so it doesn't span the full page when left column is wide */
+    #question{
+      max-width:100%;
+    }
+    pre{
+      background:#fafbfd;
+      padding:12px;
+      border-radius:6px;
+      overflow:auto;
+      border:1px solid var(--border);
+      word-wrap: break-word;
+      white-space: pre-wrap;
+      max-width: 100%;
+    }
+    .controls{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+    button{
+      background:var(--accent);
+      color:#fff;
+      border:none;
+      padding:10px 14px;
+      border-radius:6px;
+      cursor:pointer;
+      font-weight:600;
+      white-space: nowrap;
+    }
+    button:disabled{
+      background:#cbd5e1;
+      color:#94a3b8;
+      cursor:not-allowed;
+    }
+    button.ghost{
+      background:transparent;
+      color:var(--accent);
+      border:1px solid var(--border);
+    }
+    .small{
+      font-size:0.9rem;
+      color:var(--muted);
+    }
+    .row{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+    .col{
+      flex: 1;
+      min-width: 300px;
+      box-sizing: border-box;
+    }
+    #history{
+      max-height:320px;
+      overflow:auto;
+      word-break:break-word;
+      width: 100%;
+    }
+    .stat{
+      display:inline-block;
+      min-width:160px;
+      margin-right:12px;
+      color:var(--muted);
+    }
+    .muted{
+      color:var(--muted);
+    }
+    .badge{
+      display:inline-block;
+      padding:6px 10px;
+      border-radius:6px;
+      background:#f1f5f9;
+      border:1px solid var(--border);
+      font-weight:600;
+      color:var(--muted);
+      white-space: nowrap;
+    }
+    
+    /* 表格样式 */
+    .result-table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-top: 8px; 
+      font-size: 0.9rem; 
+      overflow-x: auto;
+      display: block;
+    }
+    .result-table th { 
+      background: #f8fafc; 
+      text-align: left; 
+      padding: 8px 12px; 
+      border-bottom: 1px solid var(--border); 
+      font-weight: 600; 
+      color: var(--muted); 
+      white-space: nowrap;
+    }
+    .result-table td { 
+      padding: 8px 12px; 
+      border-bottom: 1px solid #f1f5f9; 
+      word-break: break-word;
+    }
+    .result-table tr:last-child td { 
+      border-bottom: none; 
+    }
+    .result-info { 
+      color: var(--muted); 
+      font-size: 0.9rem; 
+      margin-top: 8px; 
+      word-break: break-word;
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+      body {
+        padding: 16px;
+      }
+      
+      .row {
+        flex-direction: column;
+      }
+      
+      .col {
+        min-width: 100%;
+        width: 100%;
+      }
+      
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      
+      .controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      
+      h1 {
+        font-size: 1.5rem;
+      }
+      
+      .stat {
+        display: block;
+        margin-right: 0;
+        margin-bottom: 8px;
+        min-width: auto;
+      }
+      
+      #question {
+        height: 100px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 12px;
+      }
+      
+      h1 {
+        font-size: 1.3rem;
+      }
+      
+      .card {
+        padding: 12px;
+      }
+      
+      button {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-bubble">RAG</div>
+      <div>
+        <h1>基于RAG的自然语言SQL查询 项目实例演示</h1>
+        <p class="small">NIS3351数据库原理与安全课程大作业，在本地运行的 FastAPI 服务上演示 RAG 到 SQL 的查询流程。</p>
+      </div>
+    </header>
+
+    <div style="margin-top:12px" class="controls">
+      <button id="btn-switch-mode" class="ghost">切换到测试模式</button>
+      <div style="flex:1"></div>
+      <div id="global-controls">
+        <button id="btn-init">初始化系统</button>
+        <span id="init-status" class="badge muted" style="margin-left:10px">未初始化</span>
+      </div>
+    </div>
+
+    <div id="sys" class="card">
+      <strong>服务器 / 系统 状态</strong>
+      <div id="server-status" class="muted">--</div>
+      <div style="margin-top:8px">
+        <span class="stat">CPU: <span id="cpu">-</span>%</span>
+        <span class="stat">内存: <span id="mem">-</span>%</span>
+        <span class="stat">GPU 可用: <span id="gpu-avail">-</span></span>
+        <span class="stat">GPU 数量: <span id="gpu-count">-</span></span>
+      </div>
+      <div id="gpu-details" style="margin-top:8px" class="muted"></div>
+    </div>
+
+    <hr />
+    <div id="chat-page" style="display:none" class="card">
+      <div>
+        <label style="margin-right:12px"><input type="radio" name="mode" id="mode-rag" value="rag" checked /> 有RAG</label>
+        <label style="margin-right:12px"><input type="radio" name="mode" id="mode-no-rag" value="no_rag" /> 无RAG</label>
+        <label><input type="radio" name="mode" id="mode-hybrid" value="hybrid" /> 混合模式（同时生成有RAG和无RAG的 SQL）</label>
+      </div>
+
+      <div style="margin-top:12px" class="row">
+        <div class="col">
+          <div style="margin-top:10px">
+            <textarea id="question" placeholder="输入自然语言问题（例如：查询前10个用户的基本信息）"></textarea>
+            <div style="margin-top:8px">
+              <button id="btn-send">发送</button>
+              <span id="loading" style="display:none">⏳ 处理中...</span>
+            </div>
+          </div>
+
+          <h2>SQL查询结果</h2>
+          <div>
+            <h3>生成的 SQL</h3>
+            <pre id="sql">(none)</pre>
+
+            <h3>执行结果</h3>
+            <div id="result-container">
+              <div id="result-status" class="result-info"></div>
+              <div id="result-table-container"></div>
+            </div>
+
+            <h3>错误 / 信息</h3>
+            <pre id="error">(none)</pre>
+          </div>
+        </div>
+
+        <div class="col" style="min-width: 300px; max-width: 100%;">
+          <h2>查询历史</h2>
+          <div id="history"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tests-page" style="display:none" class="card">
+      <div style="margin-top:8px" class="controls">
+        <button id="btn-run-tests">运行对比测试</button>
+        <span id="tests-status" class="badge muted">空闲</span>
+      </div>
+      <div id="tests-results" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <script>
+  const btnInit = document.getElementById('btn-init');
+  const initStatus = document.getElementById('init-status');
+    const btnSend = document.getElementById('btn-send');
+    const questionEl = document.getElementById('question');
+    const sqlEl = document.getElementById('sql');
+    const resultContainer = document.getElementById('result-container');
+    const resultStatus = document.getElementById('result-status');
+    const resultTableContainer = document.getElementById('result-table-container');
+    const errorEl = document.getElementById('error');
+    const historyEl = document.getElementById('history');
+    const loadingEl = document.getElementById('loading');
+    function getSelectedMode(){ const el = document.querySelector('input[name="mode"]:checked'); return el? el.value : 'rag'; }
+
+    const cpuEl = document.getElementById('cpu');
+    const memEl = document.getElementById('mem');
+    const gpuAvailEl = document.getElementById('gpu-avail');
+    const gpuCountEl = document.getElementById('gpu-count');
+    const gpuDetailsEl = document.getElementById('gpu-details');
+
+    // 格式化查询结果为表格显示（类似rag_chat_system中的display_result方法）
+    function formatResultAsTable(result) {
+      if (!result || !Array.isArray(result) || result.length === 0) {
+        return '<div class="result-info">📋 查询结果: 无数据</div>';
+      }
+
+      const columns = Object.keys(result[0]);
+      let html = `<div class="result-info">📋 查询结果 (${result.length} 行):</div>`;
+      html += '<div style="overflow-x: auto;">';
+      html += '<table class="result-table">';
+      
+      // 表头
+      html += '<thead><tr>';
+      columns.forEach(col => {
+        html += `<th>${escapeHtml(col)}</th>`;
+      });
+      html += '</tr></thead>';
+      
+      // 表体
+      html += '<tbody>';
+      result.forEach(row => {
+        html += '<tr>';
+        columns.forEach(col => {
+          const value = row[col];
+          html += `<td>${escapeHtml(String(value !== null && value !== undefined ? value : ''))}</td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      
+      return html;
+    }
+
+    async function fetchStatus(){
+      try{
+        const r = await fetch('/status');
+        const j = await r.json();
+        initStatus.textContent = j.initialized ? '已初始化' : (j.initializing ? '初始化中...' : '未初始化');
+        // disable init button while initializing or after initialized
+        if(j.initialized){
+          btnInit.disabled = true;
+          btnInit.textContent = '已初始化';
+        }else if(j.initializing){
+          btnInit.disabled = true;
+          btnInit.textContent = '初始化中...';
+        }else{
+          btnInit.disabled = false;
+          btnInit.textContent = '初始化系统';
+        }
+        const sys = j.system || {};
+        cpuEl.textContent = sys.cpu_percent ?? '-';
+        memEl.textContent = sys.mem_percent ?? '-';
+        gpuAvailEl.textContent = sys.gpu_available ? '是' : '否';
+        gpuCountEl.textContent = sys.gpu_count ?? 0;
+        gpuDetailsEl.innerHTML = '';
+        if(Array.isArray(sys.gpus)){
+          sys.gpus.forEach(g=>{
+            const div = document.createElement('div');
+            div.style.borderTop='1px solid #eee'; div.style.padding='6px 0';
+            div.innerHTML = `<b>GPU ${g.id}：</b> ${g.name || '未知'} <br> 已分配：${g.allocated || 0} / 已保留: ${g.reserved || 0}` + (g.nvidia_smi? `<br/>NVIDIA-SMI 信息：GPU占用 ${g.nvidia_smi.gpu}% ；内存占用 ${g.nvidia_smi.mem_util}% ；已用 ${g.nvidia_smi.mem_used_mb}MB / ${g.nvidia_smi.mem_total_mb}MB。` : '');
+            gpuDetailsEl.appendChild(div);
+          });
+        }
+      }catch(e){
+        initStatus.textContent = '未检测到服务';
+        cpuEl.textContent = '-'; memEl.textContent='-'; gpuAvailEl.textContent='-'; gpuCountEl.textContent='-';
+      }
+    }
+    function escapeHtml(s){
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+  const btnSwitch = document.getElementById('btn-switch-mode');
+    const chatPage = document.getElementById('chat-page');
+    const testsPage = document.getElementById('tests-page');
+    const btnRunTests = document.getElementById('btn-run-tests');
+    const testsStatus = document.getElementById('tests-status');
+    const testsResults = document.getElementById('tests-results');
+
+    function showTab(which){
+      if(which === 'chat'){
+        chatPage.style.display = '';
+        testsPage.style.display = 'none';
+      }else{
+        chatPage.style.display = 'none';
+        testsPage.style.display = '';
+      }
+    }
+
+    // 切换模式按钮
+    let mode = 'chat';
+    btnSwitch.addEventListener('click', ()=>{
+      if(mode === 'chat'){
+        mode = 'tests';
+        btnSwitch.textContent = '切换到对话模式';
+        showTab('tests');
+      }else{
+        mode = 'chat';
+        btnSwitch.textContent = '切换到测试模式';
+        showTab('chat');
+      }
+    });
+
+    btnInit.addEventListener('click', async ()=>{
+      btnInit.disabled = true;
+      initStatus.textContent = '开始初始化...(可能耗时)';
+      try{
+        const r = await fetch('/init', {method:'POST'});
+        const j = await r.json();
+        initStatus.textContent = j.status || JSON.stringify(j);
+        // poll status until initialized
+        const poll = setInterval(async ()=>{
+          const s = await fetch('/status');
+          const sj = await s.json();
+          initStatus.textContent = sj.initialized ? '已初始化' : (sj.initializing ? '初始化中...' : '未初始化');
+          // keep button disabled while initializing or after initialized
+          btnInit.disabled = sj.initialized || sj.initializing;
+          if(sj.initialized){
+            btnInit.textContent = '已初始化';
+          }else if(sj.initializing){
+            btnInit.textContent = '初始化中...';
+          }else{
+            btnInit.textContent = '初始化系统';
+          }
+          if(sj.initialized || !sj.initializing){
+            clearInterval(poll);
+            loadHistory();
+          }
+        }, 2000);
+      }catch(e){
+        initStatus.textContent = 'Initialization failed (check console)';
+        console.error(e);
+        btnInit.disabled = false;
+      }
+    });
+
+    // merged initialization - btnInit already triggers /init which initializes both systems
+
+    // Start tests non-blocking and show structured per-test progress; button becomes a Terminate button while running
+    btnRunTests.addEventListener('click', async ()=>{
+      // If a run is already active, this click acts as a terminate request
+      if(btnRunTests.dataset.running === '1'){
+        try{
+          btnRunTests.disabled = true;
+          btnRunTests.textContent = '正在发送终止请求...';
+          await fetch('/run_tests_stop', {method:'POST'});
+        }catch(e){ console.warn('stop request failed', e); }
+        return;
+      }
+
+      // Begin a new test run
+      testsStatus.textContent = '运行中';
+      testsResults.innerHTML = '';
+      btnRunTests.dataset.running = '1';
+      btnRunTests.textContent = '终止';
+
+      try{
+        const r = await fetch('/run_tests_start', {method:'POST'});
+        if(!r.ok){
+          const t = await r.json();
+          testsResults.innerText = JSON.stringify(t);
+          testsStatus.textContent = '错误';
+          btnRunTests.dataset.running = '0';
+          btnRunTests.textContent = '运行对比测试';
+          return;
+        }
+      }catch(e){
+        testsStatus.textContent = '错误';
+        testsResults.innerText = String(e);
+        btnRunTests.dataset.running = '0';
+        btnRunTests.textContent = '运行对比测试';
+        return;
+      }
+
+      // Poll structured progress
+      const shown = new Set();
+      const pollInterval = 1000;
+      const poller = setInterval(async ()=>{
+        try{
+          const resp = await fetch('/run_tests_progress');
+          if(!resp.ok) return;
+          const jp = await resp.json();
+          const running = Boolean(jp.running);
+          const results = Array.isArray(jp.results) ? jp.results : [];
+
+          // Render any new results in order
+          for(let i=0;i<results.length;i++){
+            if(shown.has(i)) continue;
+            const item = results[i] || {};
+            const q = escapeHtml(item.question || item.prompt || '');
+            const withRag = escapeHtml(item.sql_with_rag || item.sql_with_rag_text || item.sql || '');
+            const noRag = escapeHtml(item.sql_no_rag || item.sql_no_rag_text || item.sql_no_rag || '');
+
+            const div = document.createElement('div');
+            div.style.borderTop='1px solid #eee'; div.style.padding='8px 0';
+            div.innerHTML = `<div><b>问题${i+1}：</b>${q}</div>` +
+                            `<div style="margin-top:6px"><b>有RAG生成结果：</b><pre style="margin:6px 0">${withRag || '(无)'}</pre></div>` +
+                            `<div><b>无RAG生成结果：</b><pre style="margin:6px 0">${noRag || '(无)'}</pre></div>`;
+            testsResults.appendChild(div);
+            shown.add(i);
+          }
+
+          testsStatus.textContent = running ? '运行中' : '已完成';
+
+          if(!running){
+            clearInterval(poller);
+            btnRunTests.dataset.running = '0';
+            btnRunTests.textContent = '运行对比测试';
+            btnRunTests.disabled = false;
+
+            // append a brief footer with final count if available
+            try{
+              const res = await fetch('/run_tests_result');
+              if(res.ok){
+                const jr = await res.json();
+                if(Array.isArray(jr.results)){
+                  const footer = document.createElement('div');
+                  footer.style.marginTop='12px'; footer.style.paddingTop='8px'; footer.style.borderTop='2px dashed #ffdede';
+                  footer.innerHTML = `<b>测试完成，共 ${jr.results.length} 条结果</b>`;
+                  testsResults.appendChild(footer);
+                }
+              }
+            }catch(e){ /* ignore */ }
+          }
+        }catch(e){
+          console.warn('poll error', e);
+        }
+      }, pollInterval);
+    });
+
+    async function loadHistory(){
+      try{
+        const r = await fetch('/history');
+        if(!r.ok){ historyEl.innerText = '无历史记录（系统未初始化）'; return; }
+        const h = await r.json();
+        historyEl.innerHTML = '';
+        // show newest first
+        for(let i=h.length-1;i>=0;i--){
+          const item = h[i];
+          const div = document.createElement('div');
+          div.style.borderTop = '1px solid #eee';
+          div.style.padding = '8px 0';
+
+          const time = item.time || '';
+          const question = item.question || '';
+
+          let inner = `<div style="font-size:0.95rem;color:var(--muted)"><b>时间：</b> ${time}</div>`;
+          inner += `<div style="margin-top:6px"><b>问题：</b> ${escapeHtml(question)}</div>`;
+
+          if(item.mode === 'hybrid'){
+            const no_sql = item.sql_no_rag || '';
+            const with_sql = item.sql_with_rag || '';
+            const no_exec = item.no_rag_exec || {};
+            const with_exec = item.with_rag_exec || {};
+
+            inner += `<div style="margin-top:8px"><b>有RAG生成结果：</b><pre>${escapeHtml(with_sql) || '(无)'}</pre>`;
+            inner += `<div><b>执行：</b> ${with_exec.executed ? (with_exec.success ? '<span style="color:green">成功</span>' : '<span style="color:red">失败</span>') : '<span style="color:#666">未执行</span>'}</div>`;
+            if(with_exec.executed){
+              if(with_exec.success){
+                inner += `<div style="margin-top:6px"><b>查询结果：</b>${formatResultAsTable(with_exec.result||[])}</div>`;
+              }else{
+                inner += `<div style="margin-top:6px"><b>错误信息：</b><pre>${escapeHtml(String(with_exec.error||''))}</pre></div>`;
+              }
+            }
+            inner += `</div>`;
+
+            inner += `<div style="margin-top:8px"><b>无RAG生成结果：</b><pre>${escapeHtml(no_sql) || '(无)'}</pre>`;
+            inner += `<div><b>执行：</b> ${no_exec.executed ? (no_exec.success ? '<span style="color:green">成功</span>' : '<span style="color:red">失败</span>') : '<span style="color:#666">未执行</span>'}</div>`;
+            if(no_exec.executed){
+              if(no_exec.success){
+                inner += `<div style="margin-top:6px"><b>查询结果：</b>${formatResultAsTable(no_exec.result||[])}</div>`;
+              }else{
+                inner += `<div style="margin-top:6px"><b>错误信息：</b><pre>${escapeHtml(String(no_exec.error||''))}</pre></div>`;
+              }
+            }
+            inner += `</div>`;
+          }else{
+            // non-hybrid entry
+            const sql = item.sql || item.sql_query || '';
+            inner += `<div style="margin-top:8px"><b>生成的 SQL：</b><pre>${escapeHtml(sql) || '(无)'}</pre></div>`;
+            inner += `<div style="margin-top:6px"><b>查询是否成功：</b> ${item.execution_success ? '<span style="color:green">是</span>' : '<span style="color:red">否</span>'}</div>`;
+            if(item.execution_success){
+              inner += `<div style="margin-top:6px"><b>查询结果：</b>${formatResultAsTable(item.execution_result||[])}</div>`;
+            }else if(item.error_message){
+              inner += `<div style="margin-top:6px"><b>错误信息：</b><pre>${escapeHtml(String(item.error_message))}</pre></div>`;
+            }
+          }
+
+          div.innerHTML = inner;
+          historyEl.appendChild(div);
+        }
+      }catch(e){ console.warn(e); }
+    }
+
+    btnSend.addEventListener('click', async ()=>{
+      const question = questionEl.value.trim();
+    const selectedMode = getSelectedMode();
+    const use_rag = (selectedMode === 'rag');
+  if(!question) return alert('请输入问题');
+      loadingEl.style.display = '';
+      sqlEl.textContent = '(waiting)';
+      resultStatus.textContent = '';
+      resultTableContainer.innerHTML = '';
+      errorEl.textContent = '(waiting)';
+      try{
+        const r = await fetch('/query', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({question, use_rag, hybrid: (selectedMode === 'hybrid')})
+        });
+        const j = await r.json();
+        if(r.ok){
+          // Handle hybrid response (two SQLs)
+          if(j.sql_query_with_rag !== undefined || j.sql_query_no_rag !== undefined){
+            const withSql = j.sql_query_with_rag || '(无)';
+            const noSql = j.sql_query_no_rag || '(无)';
+            sqlEl.innerHTML = `<div><b>有RAG生成：</b><pre>${escapeHtml(withSql)}</pre></div><div style="margin-top:6px"><b>无RAG生成：</b><pre>${escapeHtml(noSql)}</pre></div>`;
+
+            // show execution summaries if present
+            const noExec = j.no_rag_execution || {};
+            const withExec = j.with_rag_execution || {};
+            let resultHtml = '';
+            resultHtml += `<div><b>有RAG 执行：</b> ${withExec.executed ? (withExec.success ? '<span style="color:green">成功</span>' : '<span style="color:red">失败</span>') : '<span style="color:#666">未执行</span>'}</div>`;
+            if(withExec.executed){ 
+              if(withExec.success){
+                resultHtml += formatResultAsTable(withExec.result||[]);
+              }else{
+                resultHtml += `<pre>${escapeHtml(String(withExec.error||''))}</pre>`;
+              }
+            }
+            resultHtml += `<div style="margin-top:6px"><b>无RAG 执行：</b> ${noExec.executed ? (noExec.success ? '<span style="color:green">成功</span>' : '<span style="color:red">失败</span>') : '<span style="color:#666">未执行</span>'}</div>`;
+            if(noExec.executed){ 
+              if(noExec.success){
+                resultHtml += formatResultAsTable(noExec.result||[]);
+              }else{
+                resultHtml += `<pre>${escapeHtml(String(noExec.error||''))}</pre>`;
+              }
+            }
+            resultTableContainer.innerHTML = resultHtml;
+            errorEl.textContent = '';
+          }else{
+            sqlEl.textContent = j.sql_query || '(无 SQL)';
+            if(j.execution_success){
+              resultStatus.textContent = `✅ 查询成功，返回 ${Array.isArray(j.execution_result) ? j.execution_result.length : 0} 行结果`;
+              resultTableContainer.innerHTML = formatResultAsTable(j.execution_result);
+              errorEl.textContent = '';
+            }else{
+              resultStatus.textContent = '❌ 查询执行失败';
+              resultTableContainer.innerHTML = '';
+              errorEl.textContent = j.error_message || '(无错误信息)';
+            }
+          }
+          loadHistory();
+        }else{
+          const text = await r.text();
+          errorEl.textContent = text;
+          sqlEl.textContent = '';
+          resultStatus.textContent = '';
+          resultTableContainer.innerHTML = '';
+        }
+      }catch(e){
+        console.error(e);
+        errorEl.textContent = String(e);
+        resultStatus.textContent = '';
+        resultTableContainer.innerHTML = '';
+      }finally{
+        loadingEl.style.display = 'none';
+      }
+    });
+
+  // initial status and python output
+  fetchStatus();
+  setInterval(fetchStatus, 3000);
+    // default to chat tab
+    showTab('chat');
+  </script>
+</body>
+</html>

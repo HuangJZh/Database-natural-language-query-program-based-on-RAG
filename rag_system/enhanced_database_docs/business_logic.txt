@@ -1,8 +1,0 @@
-业务逻辑和规则
-============================================================
-
-• 用户忠诚度等级: Bronze(青铜) < Silver(白银) < Gold(黄金) < Platinum(白金)
-• 订单状态流转: pending(待处理) → confirmed(已确认) → shipped(已发货) → delivered(已送达)
-• 支付状态: pending(待支付) → paid(已支付) → refunded(已退款)
-• 库存预警: 当stock_quantity <= min_stock_level时触发补货提醒
-• 用户注册: registration_date记录注册时间，last_login记录最后登录时间
