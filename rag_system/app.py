@@ -293,7 +293,7 @@ async def init_system(background_tasks: BackgroundTasks):
                         model = AutoModelForCausalLM.from_pretrained(
                             model_name,
                             quantization_config=quantization_config,
-                            device_map="cuda"
+                            device_map="cuda",
                             # device_map="auto",
                             dtype=torch.float16,
                             trust_remote_code=True
