@@ -14,121 +14,333 @@
       --muted:#6b7280;
       --border:#e6e9ef;
     }
-    html,body{height:100%;}
-    body { font-family: 'Roboto', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin: 24px; max-width: 1100px; background: var(--bg); color:#0f172a }
-    header{display:flex;align-items:flex-start;gap:14px}
-    h1 { margin:0; font-size:1.8rem; color:var(--accent); font-weight:700 }
-    .logo-bubble{width:48px;height:48px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;box-shadow:0 2px 8px rgba(31,111,235,0.12)}
-    p.small { font-size:0.95rem; color:var(--muted); margin-top:6px }
+    html,body{height:100%;margin:0;padding:0;}
+    body { 
+      font-family: 'Roboto', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; 
+      margin: 0;
+      padding: 24px;
+      background: var(--bg); 
+      color:#0f172a;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .container {
+      max-width: none;
+      width: 100%;
+      margin: 0 auto;
+    }
+    header{
+      display:flex;
+      align-items:flex-start;
+      gap:14px;
+      width: 100%;
+    }
+    h1 { 
+      margin:0; 
+      font-size:1.8rem; 
+      color:var(--accent); 
+      font-weight:700;
+      word-wrap: break-word;
+    }
+    .logo-bubble{
+      width:48px;
+      height:48px;
+      border-radius:8px;
+      background:var(--accent);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-weight:700;
+      box-shadow:0 2px 8px rgba(31,111,235,0.12);
+      flex-shrink: 0;
+    }
+    p.small { 
+      font-size:0.95rem; 
+      color:var(--muted); 
+      margin-top:6px;
+      word-wrap: break-word;
+    }
 
     /* cards */
-    .card{background:var(--card); padding:16px; border-radius:8px; box-shadow:0 2px 8px rgba(16,24,40,0.04); margin-top:12px; border:1px solid var(--border)}
-    textarea{width:100%;height:120px;padding:12px;border-radius:6px;border:1px solid var(--border);font-size:1rem;box-sizing:border-box}
-    /* limit the question textarea width so it doesn't span the full page when left column is wide */
-    #question{max-width:720px}
-    @media (max-width:900px){
-      /* on narrower screens allow full width */
-      #question{max-width:100%}
+    .card{
+      background:var(--card); 
+      padding:16px; 
+      border-radius:8px; 
+      box-shadow:0 2px 8px rgba(16,24,40,0.04); 
+      margin-top:12px; 
+      border:1px solid var(--border);
+      width: 100%;
+      box-sizing: border-box;
     }
-    pre{background:#fafbfd;padding:12px;border-radius:6px;overflow:auto;border:1px solid var(--border)}
-    .controls{display:flex;gap:12px;align-items:center}
-    button{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:6px;cursor:pointer;font-weight:600}
-    button:disabled{background:#cbd5e1;color:#94a3b8;cursor:not-allowed}
-    button.ghost{background:transparent;color:var(--accent);border:1px solid var(--border)}
-    .small{font-size:0.9rem;color:var(--muted)}
-  .row{display:flex;gap:12px;align-items:flex-start}
-  .col{flex:1;min-width:0}
-  #history{max-height:320px;overflow:auto;word-break:break-word}
-  pre{background:#fafbfd;padding:12px;border-radius:6px;overflow:auto;border:1px solid var(--border);white-space:pre-wrap}
-    .stat{display:inline-block;min-width:160px;margin-right:12px;color:var(--muted)}
-    .muted{color:var(--muted)}
-    .badge{display:inline-block;padding:6px 10px;border-radius:6px;background:#f1f5f9;border:1px solid var(--border);font-weight:600;color:var(--muted)}
+    textarea{
+      width:100%;
+      height:120px;
+      padding:12px;
+      border-radius:6px;
+      border:1px solid var(--border);
+      font-size:1rem;
+      box-sizing:border-box;
+      resize: vertical;
+    }
+    /* limit the question textarea width so it doesn't span the full page when left column is wide */
+    #question{
+      max-width:100%;
+    }
+    pre{
+      background:#fafbfd;
+      padding:12px;
+      border-radius:6px;
+      overflow:auto;
+      border:1px solid var(--border);
+      word-wrap: break-word;
+      white-space: pre-wrap;
+      max-width: 100%;
+    }
+    .controls{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+    button{
+      background:var(--accent);
+      color:#fff;
+      border:none;
+      padding:10px 14px;
+      border-radius:6px;
+      cursor:pointer;
+      font-weight:600;
+      white-space: nowrap;
+    }
+    button:disabled{
+      background:#cbd5e1;
+      color:#94a3b8;
+      cursor:not-allowed;
+    }
+    button.ghost{
+      background:transparent;
+      color:var(--accent);
+      border:1px solid var(--border);
+    }
+    .small{
+      font-size:0.9rem;
+      color:var(--muted);
+    }
+    .row{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+    .col{
+      flex: 1;
+      min-width: 300px;
+      box-sizing: border-box;
+    }
+    #history{
+      max-height:320px;
+      overflow:auto;
+      word-break:break-word;
+      width: 100%;
+    }
+    .stat{
+      display:inline-block;
+      min-width:160px;
+      margin-right:12px;
+      color:var(--muted);
+    }
+    .muted{
+      color:var(--muted);
+    }
+    .badge{
+      display:inline-block;
+      padding:6px 10px;
+      border-radius:6px;
+      background:#f1f5f9;
+      border:1px solid var(--border);
+      font-weight:600;
+      color:var(--muted);
+      white-space: nowrap;
+    }
     
     /* 表格样式 */
-    .result-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.9rem; }
-    .result-table th { background: #f8fafc; text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); font-weight: 600; color: var(--muted); }
-    .result-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; }
-    .result-table tr:last-child td { border-bottom: none; }
-    .result-info { color: var(--muted); font-size: 0.9rem; margin-top: 8px; }
+    .result-table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-top: 8px; 
+      font-size: 0.9rem; 
+      overflow-x: auto;
+      display: block;
+    }
+    .result-table th { 
+      background: #f8fafc; 
+      text-align: left; 
+      padding: 8px 12px; 
+      border-bottom: 1px solid var(--border); 
+      font-weight: 600; 
+      color: var(--muted); 
+      white-space: nowrap;
+    }
+    .result-table td { 
+      padding: 8px 12px; 
+      border-bottom: 1px solid #f1f5f9; 
+      word-break: break-word;
+    }
+    .result-table tr:last-child td { 
+      border-bottom: none; 
+    }
+    .result-info { 
+      color: var(--muted); 
+      font-size: 0.9rem; 
+      margin-top: 8px; 
+      word-break: break-word;
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+      body {
+        padding: 16px;
+      }
+      
+      .row {
+        flex-direction: column;
+      }
+      
+      .col {
+        min-width: 100%;
+        width: 100%;
+      }
+      
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      
+      .controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      
+      h1 {
+        font-size: 1.5rem;
+      }
+      
+      .stat {
+        display: block;
+        margin-right: 0;
+        margin-bottom: 8px;
+        min-width: auto;
+      }
+      
+      #question {
+        height: 100px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 12px;
+      }
+      
+      h1 {
+        font-size: 1.3rem;
+      }
+      
+      .card {
+        padding: 12px;
+      }
+      
+      button {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+      }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <div class="logo-bubble">RAG</div>
-    <div>
-      <h1>基于RAG的自然语言SQL查询 项目实例演示</h1>
-      <p class="small">NIS3351数据库原理与安全课程大作业，在本地运行的 FastAPI 服务上演示 RAG 到 SQL 的查询流程。</p>
-    </div>
-  </header>
+  <div class="container">
+    <header>
+      <div class="logo-bubble">RAG</div>
+      <div>
+        <h1>基于RAG的自然语言SQL查询 项目实例演示</h1>
+        <p class="small">NIS3351数据库原理与安全课程大作业，在本地运行的 FastAPI 服务上演示 RAG 到 SQL 的查询流程。</p>
+      </div>
+    </header>
 
-  <div style="margin-top:12px" class="controls">
-    <button id="btn-switch-mode" class="ghost">切换到测试模式</button>
-    <div style="flex:1"></div>
-    <div id="global-controls">
-      <button id="btn-init">初始化系统</button>
-      <span id="init-status" class="badge muted" style="margin-left:10px">未初始化</span>
-    </div>
-  </div>
-
-  <div id="sys" class="card">
-    <strong>服务器 / 系统 状态</strong>
-    <div id="server-status" class="muted">--</div>
-    <div style="margin-top:8px">
-      <span class="stat">CPU: <span id="cpu">-</span>%</span>
-      <span class="stat">内存: <span id="mem">-</span>%</span>
-      <span class="stat">GPU 可用: <span id="gpu-avail">-</span></span>
-      <span class="stat">GPU 数量: <span id="gpu-count">-</span></span>
-    </div>
-    <div id="gpu-details" style="margin-top:8px" class="muted"></div>
-  </div>
-
-  <hr />
-  <div id="chat-page" style="display:none" class="card">
-    <div>
-      <label style="margin-right:12px"><input type="radio" name="mode" id="mode-rag" value="rag" checked /> 有RAG</label>
-      <label style="margin-right:12px"><input type="radio" name="mode" id="mode-no-rag" value="no_rag" /> 无RAG</label>
-      <label><input type="radio" name="mode" id="mode-hybrid" value="hybrid" /> 混合模式（同时生成有RAG和无RAG的 SQL）</label>
+    <div style="margin-top:12px" class="controls">
+      <button id="btn-switch-mode" class="ghost">切换到测试模式</button>
+      <div style="flex:1"></div>
+      <div id="global-controls">
+        <button id="btn-init">初始化系统</button>
+        <span id="init-status" class="badge muted" style="margin-left:10px">未初始化</span>
+      </div>
     </div>
 
-    <div style="margin-top:12px" class="row">
-      <div class="col">
-        <div style="margin-top:10px">
-          <textarea id="question" placeholder="输入自然语言问题（例如：查询前10个用户的基本信息）"></textarea>
-          <div style="margin-top:8px">
-            <button id="btn-send">发送</button>
-            <span id="loading" style="display:none">⏳ 处理中...</span>
+    <div id="sys" class="card">
+      <strong>服务器 / 系统 状态</strong>
+      <div id="server-status" class="muted">--</div>
+      <div style="margin-top:8px">
+        <span class="stat">CPU: <span id="cpu">-</span>%</span>
+        <span class="stat">内存: <span id="mem">-</span>%</span>
+        <span class="stat">GPU 可用: <span id="gpu-avail">-</span></span>
+        <span class="stat">GPU 数量: <span id="gpu-count">-</span></span>
+      </div>
+      <div id="gpu-details" style="margin-top:8px" class="muted"></div>
+    </div>
+
+    <hr />
+    <div id="chat-page" style="display:none" class="card">
+      <div>
+        <label style="margin-right:12px"><input type="radio" name="mode" id="mode-rag" value="rag" checked /> 有RAG</label>
+        <label style="margin-right:12px"><input type="radio" name="mode" id="mode-no-rag" value="no_rag" /> 无RAG</label>
+        <label><input type="radio" name="mode" id="mode-hybrid" value="hybrid" /> 混合模式（同时生成有RAG和无RAG的 SQL）</label>
+      </div>
+
+      <div style="margin-top:12px" class="row">
+        <div class="col">
+          <div style="margin-top:10px">
+            <textarea id="question" placeholder="输入自然语言问题（例如：查询前10个用户的基本信息）"></textarea>
+            <div style="margin-top:8px">
+              <button id="btn-send">发送</button>
+              <span id="loading" style="display:none">⏳ 处理中...</span>
+            </div>
+          </div>
+
+          <h2>SQL查询结果</h2>
+          <div>
+            <h3>生成的 SQL</h3>
+            <pre id="sql">(none)</pre>
+
+            <h3>执行结果</h3>
+            <div id="result-container">
+              <div id="result-status" class="result-info"></div>
+              <div id="result-table-container"></div>
+            </div>
+
+            <h3>错误 / 信息</h3>
+            <pre id="error">(none)</pre>
           </div>
         </div>
 
-        <h2>SQL查询结果</h2>
-        <div>
-          <h3>生成的 SQL</h3>
-          <pre id="sql">(none)</pre>
-
-          <h3>执行结果</h3>
-          <div id="result-container">
-            <div id="result-status" class="result-info"></div>
-            <div id="result-table-container"></div>
-          </div>
-
-          <h3>错误 / 信息</h3>
-          <pre id="error">(none)</pre>
+        <div class="col" style="min-width: 300px; max-width: 100%;">
+          <h2>查询历史</h2>
+          <div id="history"></div>
         </div>
       </div>
+    </div>
 
-      <div class="col" style="max-width:420px">
-        <h2>查询历史</h2>
-        <div id="history"></div>
+    <div id="tests-page" style="display:none" class="card">
+      <div style="margin-top:8px" class="controls">
+        <button id="btn-run-tests">运行对比测试</button>
+        <span id="tests-status" class="badge muted">空闲</span>
       </div>
+      <div id="tests-results" style="margin-top:12px"></div>
     </div>
-  </div>
-
-  <div id="tests-page" style="display:none" class="card">
-    <div style="margin-top:8px" class="controls">
-      <button id="btn-run-tests">运行对比测试</button>
-      <span id="tests-status" class="badge muted">空闲</span>
-    </div>
-    <div id="tests-results" style="margin-top:12px"></div>
   </div>
 
   <script>
@@ -159,6 +371,7 @@
 
       const columns = Object.keys(result[0]);
       let html = `<div class="result-info">📋 查询结果 (${result.length} 行):</div>`;
+      html += '<div style="overflow-x: auto;">';
       html += '<table class="result-table">';
       
       // 表头
@@ -178,7 +391,7 @@
         });
         html += '</tr>';
       });
-      html += '</tbody></table>';
+      html += '</tbody></table></div>';
       
       return html;
     }
