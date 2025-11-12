@@ -341,9 +341,8 @@ async def load_embeddings():
             from langchain_community.embeddings import HuggingFaceEmbeddings
             emb = HuggingFaceEmbeddings(
                 model_name=cfg.EMBEDDING_MODEL_NAME,
-                model_kwargs={'device': 'cuda' if torch.cuda.is_available() else 'cpu'}
-                # model_kwargs={'device': 'cpu'
-                              },
+                model_kwargs={'device': 'cuda' if torch.cuda.is_available() else 'cpu'},
+                # model_kwargs={'device': 'cpu'},
                 encode_kwargs={'normalize_embeddings': True},
                 query_instruction="为这个句子生成表示以用于检索相关文章："
             )
