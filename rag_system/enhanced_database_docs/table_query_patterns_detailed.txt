@@ -1,0 +1,18 @@
+表详细文档: query_patterns
+============================================================
+
+列详细信息:
+- pattern_id: int | Null: NO | Key: PRI | Default: None
+- pattern_type: varchar(100) | Null: NO | Key: MUL | Default: None
+- user_query_example: text | Null: NO | Key:  | Default: None
+- expected_intent: text | Null: NO | Key:  | Default: None
+- validation_rules: text | Null: YES | Key:  | Default: None
+- common_misconceptions: text | Null: YES | Key:  | Default: None
+- suggested_improvements: text | Null: YES | Key:  | Default: None
+- success_count: int | Null: YES | Key:  | Default: 0
+- failure_count: int | Null: YES | Key:  | Default: 0
+- created_at: timestamp | Null: YES | Key:  | Default: CURRENT_TIMESTAMP
+
+索引信息:
+- pattern_id (BTREE) - 唯一
+- pattern_type (BTREE) - 非唯一

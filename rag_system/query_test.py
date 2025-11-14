@@ -51,33 +51,14 @@ if __name__ == "__main__":
     print("test_rag_mid 简单查询工具")
     
     run_sql_query("""
-SELECT
-    u.user_id,
-    COUNT(o.order_id) AS order_count
-FROM
-    users u
-JOIN
-    orders o ON u.user_id = o.user_id
-GROUP BY
-    u.user_id
-HAVING
-    SUM(oi.item_price * oi.quantity) > (
-        SELECT AVG(total_spent)
-        FROM (
-            SELECT
-                SUM(oi.item_price * oi.quantity) AS total_spent
-            FROM
-                users u2
-            JOIN
-                orders o2 ON u2.user_id = o2.user_id
-            JOIN
-                order_items oi ON o2.order_id = oi.order_id
-            GROUP BY
-                u2.user_id
-        ) AS avg_subquery
-    )
-ORDER BY
-    SUM(oi.item_price * oi.quantity) DESC
+ SELECT u.username, COUNT(o.order_id) AS order_count, SUM(o.total_amount) AS total_spent
+FROM users u
+JOIN orders o ON u.user_id = o.user_id
+GROUP BY u.user_id, u.username
+HAVING total_spent > (
+    SELECT AVG(total_amount) FROM orders
+)
+ORDER BY total_spent DESC
 LIMIT 10
     """, "用户订单连接查询")
     

@@ -1,0 +1,18 @@
+表详细文档: inventory
+============================================================
+
+列详细信息:
+- inventory_id: int | Null: NO | Key: PRI | Default: None
+- product_id: int | Null: NO | Key: MUL | Default: None
+- warehouse_id: int | Null: YES | Key: MUL | Default: None
+- quantity: int | Null: NO | Key:  | Default: None
+- reserved_quantity: int | Null: YES | Key:  | Default: 0
+- available_quantity: int | Null: YES | Key:  | Default: None
+- last_restock_date: date | Null: YES | Key:  | Default: None
+- next_restock_date: date | Null: YES | Key:  | Default: None
+- created_at: timestamp | Null: YES | Key:  | Default: CURRENT_TIMESTAMP
+
+索引信息:
+- inventory_id (BTREE) - 唯一
+- product_id (BTREE) - 非唯一
+- warehouse_id (BTREE) - 非唯一

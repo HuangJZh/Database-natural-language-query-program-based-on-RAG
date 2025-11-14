@@ -1,0 +1,43 @@
+表详细文档: products
+============================================================
+
+列详细信息:
+- product_id: int | Null: NO | Key: PRI | Default: None
+- product_name: varchar(200) | Null: NO | Key:  | Default: None
+- description: text | Null: YES | Key:  | Default: None
+- category_id: int | Null: YES | Key: MUL | Default: None
+- subcategory_id: int | Null: YES | Key:  | Default: None
+- brand: varchar(100) | Null: YES | Key: MUL | Default: None
+- price: decimal(10,2) | Null: NO | Key: MUL | Default: None
+- cost_price: decimal(10,2) | Null: YES | Key:  | Default: None
+- stock_quantity: int | Null: YES | Key:  | Default: 0
+- min_stock_level: int | Null: YES | Key:  | Default: 10
+- weight: decimal(8,2) | Null: YES | Key:  | Default: None
+- dimensions: varchar(50) | Null: YES | Key:  | Default: None
+- color: varchar(30) | Null: YES | Key:  | Default: None
+- size: varchar(20) | Null: YES | Key:  | Default: None
+- is_active: tinyint(1) | Null: YES | Key: MUL | Default: 1
+- rating: decimal(3,2) | Null: YES | Key:  | Default: 0.00
+- review_count: int | Null: YES | Key:  | Default: 0
+- created_at: timestamp | Null: YES | Key:  | Default: CURRENT_TIMESTAMP
+- updated_at: timestamp | Null: YES | Key:  | Default: CURRENT_TIMESTAMP
+
+索引信息:
+- product_id (BTREE) - 唯一
+- category_id (BTREE) - 非唯一
+- brand (BTREE) - 非唯一
+- price (BTREE) - 非唯一
+- is_active (BTREE) - 非唯一
+
+数据示例 (10 行):
+   product_id    product_name                                          description  category_id  subcategory_id          brand    price cost_price  stock_quantity  min_stock_level weight  dimensions   color size  is_active rating  review_count          created_at          updated_at
+0           1  Uniqlo Dress 1  High-quality Uniqlo Dress 1 with excellent features            4               3         Levi's   240.62     154.77             240               10   1.45  49x18x26cm    Blue    S          1   3.65           362 2025-10-29 08:30:49 2025-10-29 08:30:49
+1           2       Product 2       High-quality Product 2 with excellent features           15               4        Penguin   251.41     161.00             399               10   3.39  31x32x27cm   Black    S          1   4.35           145 2025-10-29 08:30:49 2025-10-29 08:30:49
+2           3       Product 3       High-quality Product 3 with excellent features            7               3         Scotts   307.05     118.62             625               10  19.80  50x33x39cm     Red   XL          1   4.60           230 2025-10-29 08:30:49 2025-10-29 08:30:49
+3           4       Product 4       High-quality Product 4 with excellent features            8               1           IKEA   227.15     104.05             108               10   9.10  44x34x25cm  Silver    L          1   4.86           228 2025-10-29 08:30:49 2025-10-29 08:30:49
+4           5       Product 5       High-quality Product 5 with excellent features            8               2         Scotts    66.66      32.71              63               10   6.45   25x43x3cm     Red    M          1   4.47           161 2025-10-29 08:30:49 2025-10-29 08:30:49
+5           6       Product 6       High-quality Product 6 with excellent features           13               4  HarperCollins   217.95     106.58             400               10   6.16  21x31x45cm  Silver  XXL          1   4.40           480 2025-10-29 08:30:49 2025-10-29 08:30:49
+6           7     H&M Jeans 7     High-quality H&M Jeans 7 with excellent features            4               1          Gucci   285.82     109.71             139               10  17.41   25x46x2cm    Blue    S          1   3.91           376 2025-10-29 08:30:49 2025-10-29 08:30:49
+7           8       Product 8       High-quality Product 8 with excellent features           14               5  HarperCollins   386.62     230.31             370               10  10.06   6x46x16cm   Black    L          1   4.43           290 2025-10-29 08:30:49 2025-10-29 08:30:49
+8           9  Nikon Tablet 9  High-quality Nikon Tablet 9 with excellent features            3               4          Canon  1149.95     589.28             249               10  10.62  42x25x21cm   Black    L          1   3.75           451 2025-10-29 08:30:49 2025-10-29 08:30:49
+9          10      Product 10      High-quality Product 10 with excellent features           10               2         Wilson   381.65     212.77             821               10   3.25   31x11x6cm  Silver    L          1   3.56           304 2025-10-29 08:30:49 2025-10-29 08:30:49
